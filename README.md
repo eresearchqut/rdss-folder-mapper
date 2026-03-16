@@ -5,51 +5,44 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 ## Features
 
 - **Cross-Platform**: Works seamlessly on Windows, macOS, and Linux.
-- **Easy Configuration**: Map multiple network drives using a simple configuration file or command-line arguments.
-- **Persistent Mappings**: Optionally reconnect drives on startup.
-- **Simple Installation**: Install quickly via `curl`.
+- **Standalone Binaries**: Built with `pkg` so no Node.js runtime is required on the host system.
+- **Easy Configuration**: Map multiple network drives using a simple local `folders.json` file.
+- **Typescript & Commander**: Modern CLI built with robust types and standard command parsing.
 
 ## Installation
 
-You can install the Network Drive Mapper CLI directly using `curl`. The project is hosted on GitHub.
+You can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
 
-### Linux & macOS
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-rpid-mapper/main/install.sh | bash
-```
-
-### Windows (PowerShell)
-
-```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-rpid-mapper/main/install.ps1 -UseBasicParsing | Invoke-Expression
-```
-
-_(Or use curl alias in modern PowerShell)_
+Available binaries:
+- `rdss-rpid-mapper-win.exe` (Windows)
+- `rdss-rpid-mapper-macos` (macOS)
+- `rdss-rpid-mapper-linux` (Linux)
 
 ## Usage
 
-Once installed, you can use the `drive-mapper` command to manage your network drives. The CLI primarily operates with two commands: `refresh` (default) and `reset`.
+Once installed/downloaded, you can use the `rdss-rpid-mapper` command to manage your network drives. The CLI primarily operates with two actions: `refresh` (default) and `reset`.
 
 ### Command Line Options
 
 ```bash
-drive-mapper --help
+rdss-rpid-mapper --help
 
-Refresh drive mappings (Default command)
+Usage: rdss-rpid-mapper [options]
+
+A cross-platform command-line interface (CLI) tool that allows you to create
+local folder mappings to shared network drives effortlessly.
 
 Options:
-  --version  Show version number                                       [boolean]
-  --reset    Remove all currently mapped folders                       [boolean]
-  --help     Show help                                                 [boolean]
+  --reset     Remove all currently mapped folders
+  -h, --help  display help for command
 ```
 
 ### Refresh (Default)
 
-Running the CLI without any options executes the `refresh` command. This calls the RESTful API endpoint to retrieve your folder mappings and mounts them under a local parent folder named `RDSS`.
+Running the CLI without any options executes the `refresh` command. This reads your local `folders.json` file to retrieve your folder mappings and mounts them under a local parent folder named `RDSS`.
 
 ```bash
-drive-mapper
+rdss-rpid-mapper
 ```
 
 ### Reset
@@ -57,22 +50,22 @@ drive-mapper
 To remove all currently mapped folders, use the `--reset` option.
 
 ```bash
-drive-mapper --reset
+rdss-rpid-mapper --reset
 ```
 
-## API Integration
+## Configuration Data
 
-The CLI makes a request to a RESTful API that returns a JSON mapping file containing a listing of all your available drives. Each drive entry includes:
+The CLI reads from a local `folders.json` file (in the same directory you run the command from) that returns a JSON mapping containing a listing of all your available folders. Each drive entry includes:
 
 - **RPID**: The short code and actual name of the folder. The remote location is derived from the Unix or Windows base path plus the RPID.
 - **title**: The human-readable version of the folder name.
 - **nickname**: An optional folder nickname.
 
-Example API JSON response:
+Example `folders.json`:
 
 ```json
 {
-  "drives": [
+  "folders": [
     {
       "RPID": "PRJ123",
       "title": "Project Alpha Data",
