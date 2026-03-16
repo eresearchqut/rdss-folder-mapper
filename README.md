@@ -16,69 +16,74 @@ You can install the Network Drive Mapper CLI directly using `curl`. The project 
 ### Linux & macOS
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/username/network-drive-mapper/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-rpid-mapper/main/install.sh | bash
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/username/network-drive-mapper/main/install.ps1 -UseBasicParsing | Invoke-Expression
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-rpid-mapper/main/install.ps1 -UseBasicParsing | Invoke-Expression
 ```
-*(Or use curl alias in modern PowerShell)*
 
-*Note: Replace `username/network-drive-mapper` with the actual GitHub repository path once published.*
+_(Or use curl alias in modern PowerShell)_
 
 ## Usage
 
-Once installed, you can use the `drive-mapper` command to manage your network drives.
+Once installed, you can use the `drive-mapper` command to manage your network drives. The CLI primarily operates with two commands: `refresh` (default) and `reset`.
 
-### Map a Single Drive
-
-**Windows** (Maps `\\server\share` to drive letter `Z:`):
-```bash
-drive-mapper add --remote "\\server\share" --local "Z:"
-```
-
-**macOS / Linux** (Maps `smb://server/share` to `/mnt/share`):
-```bash
-drive-mapper add --remote "smb://server/share" --local "/mnt/share"
-```
-
-### List Active Mappings
+### Command Line Options
 
 ```bash
-drive-mapper list
+drive-mapper --help
+
+Refresh drive mappings (Default command)
+
+Options:
+  --version  Show version number                                       [boolean]
+  --reset    Remove all currently mapped folders                       [boolean]
+  --help     Show help                                                 [boolean]
 ```
 
-### Remove a Mapping
+### Refresh (Default)
+
+Running the CLI without any options executes the `refresh` command. This calls the RESTful API endpoint to retrieve your folder mappings and mounts them under a local parent folder named `RDSS`.
 
 ```bash
-drive-mapper remove --local "Z:" # On Windows
-drive-mapper remove --local "/mnt/share" # On macOS/Linux
+drive-mapper
 ```
 
-## Configuration File
+### Reset
 
-You can also define your mappings in a `mappings.json` file for easier management of multiple drives:
+To remove all currently mapped folders, use the `--reset` option.
+
+```bash
+drive-mapper --reset
+```
+
+## API Integration
+
+The CLI makes a request to a RESTful API that returns a JSON mapping file containing a listing of all your available drives. Each drive entry includes:
+
+- **RPID**: The short code and actual name of the folder. The remote location is derived from the Unix or Windows base path plus the RPID.
+- **title**: The human-readable version of the folder name.
+- **nickname**: An optional folder nickname.
+
+Example API JSON response:
 
 ```json
 {
   "drives": [
     {
-      "remote": "smb://server/share1",
-      "local": "/mnt/share1"
+      "RPID": "PRJ123",
+      "title": "Project Alpha Data",
+      "nickname": "Alpha"
     },
     {
-      "remote": "smb://server/share2",
-      "local": "/mnt/share2"
+      "RPID": "PRJ456",
+      "title": "Project Beta Data"
     }
   ]
 }
-```
-
-Apply the configuration:
-```bash
-drive-mapper apply --file mappings.json
 ```
 
 ## Requirements
