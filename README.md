@@ -14,9 +14,9 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 You can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
 
 Available binaries:
-- `rdss-rpid-mapper-win.exe` (Windows)
-- `rdss-rpid-mapper-macos` (macOS)
-- `rdss-rpid-mapper-linux` (Linux)
+- [🪟 Windows (`rdss-rpid-mapper-win.exe`)](https://github.com/eresearchqut/rdss-rpid-mapper/releases/latest/download/rdss-rpid-mapper-win.exe)
+- [🍎 macOS (`rdss-rpid-mapper-macos`)](https://github.com/eresearchqut/rdss-rpid-mapper/releases/latest/download/rdss-rpid-mapper-macos)
+- [🐧 Linux (`rdss-rpid-mapper-linux`)](https://github.com/eresearchqut/rdss-rpid-mapper/releases/latest/download/rdss-rpid-mapper-linux)
 
 ## Usage
 
@@ -65,7 +65,7 @@ Example `folders.json`:
 
 ```json
 {
-  "folders": [
+  "folders": [  
     {
       "RPID": "PRJ123",
       "title": "Project Alpha Data",
