@@ -8,8 +8,8 @@ import { Command } from 'commander';
 const isWindows = os.platform() === 'win32';
 const isMac = os.platform() === 'darwin';
 
-const BASE_PATH_WIN = process.env.BASE_PATH_WIN || '\\\\rstore.qut.edu.au\\Projects';
-const BASE_PATH_NIX = process.env.BASE_PATH_NIX || 'smb://rstore.qut.edu.au/projects';
+const REMOTE_PATH_WIN = process.env.REMOTE_PATH_WIN || '\\\\rstore.qut.edu.au\\Projects';
+const REMOTE_PATH_NIX = process.env.REMOTE_PATH_NIX || 'smb://rstore.qut.edu.au/projects';
 
 // The local parent directory for mappings
 const BASE_DIR = path.join(os.homedir(), 'RDSS');
@@ -20,16 +20,16 @@ interface DriveMapping {
   nickname?: string;
 }
 
-async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliBasePath?: string): Promise<void> {
+async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string): Promise<void> {
   console.log('Refreshing drive mappings...');
   try {
     let folders: DriveMapping[] = [];
-    let configBasePath: string | undefined;
+    let configRemotePath: string | undefined;
     try {
       const fileData = fs.readFileSync(foldersFile, 'utf8');
       const parsedData = JSON.parse(fileData);
       folders = parsedData.folders || [];
-      configBasePath = parsedData.basePath;
+      configRemotePath = parsedData.remotePath;
     } catch {
       throw new Error(`Failed to read or parse ${foldersFile}. Please ensure the file exists and is valid JSON.`);
     }
@@ -49,14 +49,14 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
       fs.mkdirSync(MOUNTS_DIR, { recursive: true });
     }
 
-    const finalBasePath = cliBasePath || configBasePath;
+    const finalRemotePath = cliRemotePath || configRemotePath;
 
     for (const drive of folders) {
-      const remote = finalBasePath
-        ? `${finalBasePath}${isWindows ? '\\' : '/'}${drive.RPID}`
+      const remote = finalRemotePath
+        ? `${finalRemotePath}${isWindows ? '\\' : '/'}${drive.RPID}`
         : isWindows
-        ? `${BASE_PATH_WIN}\\${drive.RPID}`
-        : `${BASE_PATH_NIX}/${drive.RPID}`;
+        ? `${REMOTE_PATH_WIN}\\${drive.RPID}`
+        : `${REMOTE_PATH_NIX}/${drive.RPID}`;
 
       const folderName = drive.nickname || drive.RPID;
       const localPath = path.join(baseDir, folderName);
@@ -230,18 +230,18 @@ program
   .description(
     'A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network drives effortlessly.',
   )
-  .option('-r, --reset', 'Remove all currently mapped folders')
-  .option('-d, --debug', 'Enable debug logging')
+  .option('--reset', 'Remove all currently mapped folders')
+  .option('--debug', 'Enable debug logging')
   .option('-b, --base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
-  .option('-u --username <username>', 'Username for mapping')
-  .option('-p, --password <password>', 'Password for mapping')
+  .option('-u --username <username>', 'Username for remote mapping')
+  .option('-p, --password <password>', 'Password for remote mapping')
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
-  .option('--base-path <path>', 'Custom remote base path')
+  .option('-r, --remote-path <path>', 'Custom remote path')
   .action((options) => {
     if (options.reset) {
       reset(options.debug, options.baseDir);
     } else {
-      refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.basePath);
+      refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath).then();
     }
   });
 

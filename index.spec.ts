@@ -105,8 +105,8 @@ describe('Integration Test', () => {
 
       const env = {
         ...process.env,
-        BASE_PATH_WIN: basePathWin,
-        BASE_PATH_NIX: basePathNix,
+        REMOTE_PATH_WIN: basePathWin,
+        REMOTE_PATH_NIX: basePathNix,
       };
 
       execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --username testuser --password testpass`, { env, stdio: 'pipe' });
@@ -131,8 +131,8 @@ describe('Integration Test', () => {
 
       const env = {
         ...process.env,
-        BASE_PATH_WIN: basePathWin,
-        BASE_PATH_NIX: basePathNix,
+        REMOTE_PATH_WIN: basePathWin,
+        REMOTE_PATH_NIX: basePathNix,
       };
 
       try {
@@ -170,8 +170,8 @@ describe('Integration Test', () => {
 
       const env = {
         ...process.env,
-        BASE_PATH_WIN: basePathWin,
-        BASE_PATH_NIX: basePathNix,
+        REMOTE_PATH_WIN: basePathWin,
+        REMOTE_PATH_NIX: basePathNix,
       };
 
       execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile} --username testuser --password testpass`, { env, stdio: 'pipe' });
@@ -194,17 +194,17 @@ describe('Integration Test', () => {
       }
     });
 
-    test('should use custom base path when --base-path is provided', async () => {
+    test('should use custom remote path when --remote-path is provided', async () => {
       // Use an invalid host so it fails to mount reliably, allowing us to inspect the error string
-      const customBasePath = isWindows ? `\\\\invalid-test-host` : `smb://invalid-test-host:445`;
+      const customRemotePath = isWindows ? `\\\\invalid-test-host` : `smb://invalid-test-host:445`;
 
       try {
-        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --base-path ${customBasePath} --username testuser --password testpass 2>&1`, { stdio: 'pipe' });
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --remote-path ${customRemotePath} --username testuser --password testpass 2>&1`, { stdio: 'pipe' });
       } catch (e: any) {
         // Since we are mocking the mount and it might fail, we just make sure the error output
         // mentions mapping the custom path rather than the default env ones
         const outputStr = e.stderr?.toString() || e.stdout?.toString() || e.message;
-        const expectedRemote = isWindows ? `${customBasePath}\\test_share` : `${customBasePath}/test_share`;
+        const expectedRemote = isWindows ? `${customRemotePath}\\test_share` : `${customRemotePath}/test_share`;
         expect(outputStr).toContain(`Error: Failed to map ${expectedRemote}`);
       }
     });
