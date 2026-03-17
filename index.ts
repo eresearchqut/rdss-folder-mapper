@@ -230,11 +230,11 @@ program
   .description(
     'A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network drives effortlessly.',
   )
-  .option('--reset', 'Remove all currently mapped folders')
-  .option('--debug', 'Enable debug logging')
-  .option('--base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
-  .option('--username <username>', 'Username for mapping')
-  .option('--password <password>', 'Password for mapping')
+  .option('-r, --reset', 'Remove all currently mapped folders')
+  .option('-d, --debug', 'Enable debug logging')
+  .option('-b, --base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
+  .option('-u --username <username>', 'Username for mapping')
+  .option('-p, --password <password>', 'Password for mapping')
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('--base-path <path>', 'Custom remote base path')
   .action((options) => {

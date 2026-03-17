@@ -89,7 +89,7 @@ describe('Integration Test', () => {
         fs.rmSync('folders.json');
       }
       try {
-        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --reset`, { stdio: 'ignore' });
+        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} -r`, { stdio: 'ignore' });
       } catch (e) {
         // ignore
       }
