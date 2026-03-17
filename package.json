@@ -1,5 +1,5 @@
 {
-  "name": "rdss-rpid-mapper",
+  "name": "rdss-folder-mapper",
   "version": "0.0.5",
   "description": "A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network drives effortlessly. Supported on Windows, macOS, and Linux.",
   "main": "dist/index.js",
@@ -14,17 +14,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/eresearchqut/rdss-rpid-mapper.git"
+    "url": "git+https://github.com/eresearchqut/rdss-folder-mapper.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/eresearchqut/rdss-rpid-mapper/issues"
+    "url": "https://github.com/eresearchqut/rdss-folder-mapper/issues"
   },
-  "homepage": "https://github.com/eresearchqut/rdss-rpid-mapper#readme",
+  "homepage": "https://github.com/eresearchqut/rdss-folder-mapper#readme",
   "dependencies": {
+    "@stdlib/string-truncate": "^0.2.3",
     "commander": "^14.0.3"
   },
   "devDependencies": {

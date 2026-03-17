@@ -4,6 +4,7 @@ import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
 import { Command } from 'commander';
+import truncate from '@stdlib/string-truncate';
 
 const isWindows = os.platform() === 'win32';
 const isMac = os.platform() === 'darwin';
@@ -15,7 +16,7 @@ const REMOTE_PATH_NIX = process.env.REMOTE_PATH_NIX || 'smb://rstore.qut.edu.au/
 const BASE_DIR = path.join(os.homedir(), 'RDSS');
 
 interface DriveMapping {
-  RPID: string;
+  id: string;
   title?: string;
   nickname?: string;
 }
@@ -53,14 +54,21 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
 
     for (const drive of folders) {
       const remote = finalRemotePath
-        ? `${finalRemotePath}${isWindows ? '\\' : '/'}${drive.RPID}`
+        ? `${finalRemotePath}${isWindows ? '\\' : '/'}${drive.id}`
         : isWindows
-        ? `${REMOTE_PATH_WIN}\\${drive.RPID}`
-        : `${REMOTE_PATH_NIX}/${drive.RPID}`;
+        ? `${REMOTE_PATH_WIN}\\${drive.id}`
+        : `${REMOTE_PATH_NIX}/${drive.id}`;
 
-      const folderName = drive.nickname || drive.RPID;
+      let folderName = drive.nickname;
+      if (!folderName) {
+        if (drive.title) {
+          folderName = truncate(drive.title.replace(/[<>:"/\\|?*\x00-\x1F]/g, ''), 60).trim();
+        } else {
+          folderName = drive.id;
+        }
+      }
       const localPath = path.join(baseDir, folderName);
-      const mountPath = isWindows ? localPath : path.join(MOUNTS_DIR, drive.RPID);
+      const mountPath = isWindows ? localPath : path.join(MOUNTS_DIR, drive.id);
 
       let isMounted = false;
       try {
@@ -226,7 +234,7 @@ function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
 const program = new Command();
 
 program
-  .name('rdss-rpid-mapper')
+  .name('rdss-folder-mapper')
   .description(
     'A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network drives effortlessly.',
   )

@@ -79,7 +79,7 @@ describe('Integration Test', () => {
       fs.writeFileSync(
         'folders.json',
         JSON.stringify({
-          folders: [{ RPID: 'test_share', nickname: 'TestShare' }],
+          folders: [{ id: 'test_share', nickname: 'TestShare' }],
         })
       );
     });
@@ -89,7 +89,7 @@ describe('Integration Test', () => {
         fs.rmSync('folders.json');
       }
       try {
-        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} -r`, { stdio: 'ignore' });
+        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --reset`, { stdio: 'ignore' });
       } catch (e) {
         // ignore
       }
@@ -158,7 +158,7 @@ describe('Integration Test', () => {
       fs.writeFileSync(
         customFoldersFile,
         JSON.stringify({
-          folders: [{ RPID: 'test_share', nickname: 'CustomShare' }],
+          folders: [{ id: 'test_share', nickname: 'CustomShare' }],
         })
       );
 
@@ -229,6 +229,35 @@ describe('Integration Test', () => {
         // ignore reset failure
       }
       expect(fs.existsSync(fakeLocalPath)).toBe(false);
+    });
+
+    test('should truncate and remove unsafe characters from the title when nickname is not provided', async () => {
+      const customFoldersFile = path.join(process.cwd(), '.test', 'truncate-folders.json');
+      fs.writeFileSync(
+        customFoldersFile,
+        JSON.stringify({
+          folders: [{ id: 'test_share', title: 'This is a very long <title> that should definitely be truncated because it exceeds sixty characters' }],
+        })
+      );
+
+      const host = container.getHost();
+      const port = container.getMappedPort(445);
+      
+      const basePathWin = `\\\\${host}`;
+      const basePathNix = `smb://${host}:${port}`;
+
+      const env = {
+        ...process.env,
+        REMOTE_PATH_WIN: basePathWin,
+        REMOTE_PATH_NIX: basePathNix,
+      };
+
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile} --username testuser --password testpass`, { env, stdio: 'pipe' });
+
+      const expectedFolderName = 'This is a very long title that should definitely be trunc...';
+      const localPath = path.join(testRdssDir, expectedFolderName);
+      
+      expect(fs.existsSync(localPath)).toBe(true);
     });
 
     test('should assert access to multiple user home directories via smbclient', async () => {

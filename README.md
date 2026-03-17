@@ -20,20 +20,20 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 You can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
 
 Available binaries:
-- [🪟 Windows (`rdss-rpid-mapper-win.exe`)](https://github.com/eresearchqut/rdss-rpid-mapper/releases/latest/download/rdss-rpid-mapper-win.exe)
-- [🍎 macOS (`rdss-rpid-mapper-macos`)](https://github.com/eresearchqut/rdss-rpid-mapper/releases/latest/download/rdss-rpid-mapper-macos)
-- [🐧 Linux (`rdss-rpid-mapper-linux`)](https://github.com/eresearchqut/rdss-rpid-mapper/releases/latest/download/rdss-rpid-mapper-linux)
+- [🪟 Windows (`rdss-folder-mapper-win.exe`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe)
+- [🍎 macOS (`rdss-folder-mapper-macos`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos)
+- [🐧 Linux (`rdss-folder-mapper-linux`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux)
 
 ## Usage
 
-Once installed/downloaded, you can use the `rdss-rpid-mapper` command to manage your network drives. The CLI primarily operates with two actions: `refresh` (default) and `reset`.
+Once installed/downloaded, you can use the `rdss-folder-mapper` command to manage your network drives. The CLI primarily operates with two actions: `refresh` (default) and `reset`.
 
 ### Command Line Options
 
 ```bash
-rdss-rpid-mapper --help
+rdss-folder-mapper --help
 
-Usage: rdss-rpid-mapper [options]
+Usage: rdss-folder-mapper [options]
 
 A cross-platform command-line interface (CLI) tool that allows you to create
 local folder mappings to shared network drives effortlessly.
@@ -57,7 +57,7 @@ Running the CLI without any options executes the `refresh` command. This reads y
 **Note:** The sync process will automatically remove any old drive mappings under the parent `RDSS` folder before creating the new ones.
 
 ```bash
-rdss-rpid-mapper
+rdss-folder-mapper
 ```
 
 ### Reset
@@ -65,14 +65,14 @@ rdss-rpid-mapper
 To remove all currently mapped folders, use the `--reset` option.
 
 ```bash
-rdss-rpid-mapper --reset
+rdss-folder-mapper --reset
 ```
 
 ## Configuration Data
 
 The CLI reads from a local `folders.json` file (in the same directory you run the command from) that returns a JSON mapping containing a listing of all your available folders. Each drive entry includes:
 
-- **RPID**: The short code and actual name of the folder. The remote location is derived from the Unix or Windows base path plus the RPID.
+- **id**: The short code and actual name of the folder. The remote location is derived from the Unix or Windows base path plus the id.
 - **title**: The human-readable version of the folder name.
 - **nickname**: An optional folder nickname.
 
@@ -82,12 +82,12 @@ Example `folders.json`:
 {
   "folders": [  
     {
-      "RPID": "PRJ123",
+      "id": "PRJ123",
       "title": "Project Alpha Data",
       "nickname": "Alpha"
     },
     {
-      "RPID": "PRJ456",
+      "id": "PRJ456",
       "title": "Project Beta Data"
     }
   ]
