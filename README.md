@@ -1,6 +1,6 @@
 # Network Drive Mapper CLI
 
-A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network drives effortlessly. Supported on Windows, macOS, and Linux.
+A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to RDSS shared network drives effortlessly. Supported on Windows, macOS, and Linux.
 
 ## Features
 
@@ -8,6 +8,12 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 - **Standalone Binaries**: Built with `pkg` so no Node.js runtime is required on the host system.
 - **Easy Configuration**: Map multiple network drives using a simple local `folders.json` file.
 - **Typescript & Commander**: Modern CLI built with robust types and standard command parsing.
+
+## Requirements
+
+- **Windows**: Windows 10/11
+- **macOS**: macOS 10.15+ (requires SMB client, usually built-in)
+- **Linux**: Requires `cifs-utils` or `smbclient` installed on the system.
 
 ## Installation
 
@@ -88,8 +94,3 @@ Example `folders.json`:
 }
 ```
 
-## Requirements
-
-- **Windows**: Windows 10/11
-- **macOS**: macOS 10.15+ (requires SMB client, usually built-in)
-- **Linux**: Requires `cifs-utils` or `smbclient` installed on the system.
