@@ -105,7 +105,7 @@ describe('Integration Test', () => {
       };
 
       try {
-        execSync(`npx ts-node index.ts --rdss-dir ${testRdssDir} --username testuser --password testpass`, { env, stdio: 'pipe' });
+        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --username testuser --password testpass`, { env, stdio: 'pipe' });
       } catch (e: any) {
         // It might fail to mount if the OS doesn't support mounting or needs sudo
         // We'll just verify the CLI creates the folders
@@ -137,11 +137,103 @@ describe('Integration Test', () => {
       };
 
       try {
-        const output = execSync(`npx ts-node index.ts --rdss-dir ${testRdssDir} --username wronguser --password wrongpass 2>&1`, { env, stdio: 'pipe' });
-        expect(output.toString()).toContain('Warning: Failed to map');
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --username wronguser --password wrongpass 2>&1`, { env, stdio: 'pipe' });
+        expect(output.toString()).toContain('Error: Failed to map');
       } catch (e: any) {
-        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain('Warning: Failed to map');
+        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain('Error: Failed to map');
       }
+    });
+
+    test('should fail when folders.json is missing', async () => {
+      fs.rmSync('folders.json');
+      try {
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} 2>&1`, { stdio: 'pipe' });
+        expect(output.toString()).toContain('Failed to read or parse folders.json');
+      } catch (e: any) {
+        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain('Failed to read or parse folders.json');
+      }
+    });
+
+    test('should use custom folders file when --folders-file is provided', async () => {
+      const customFoldersFile = path.join(testRdssDir, 'custom-folders.json');
+      fs.writeFileSync(
+        customFoldersFile,
+        JSON.stringify({
+          folders: [{ RPID: 'custom_share', nickname: 'CustomShare' }],
+        })
+      );
+
+      const host = container.getHost();
+      const port = container.getMappedPort(445);
+      
+      const basePathWin = `\\\\${host}\\custom_share`;
+      const basePathNix = `smb://${host}:${port}/custom_share`;
+
+      const env = {
+        ...process.env,
+        BASE_PATH_WIN: basePathWin,
+        BASE_PATH_NIX: basePathNix,
+      };
+
+      try {
+        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders-file ${customFoldersFile}`, { env, stdio: 'pipe' });
+      } catch (e: any) {
+        // ignore mount errors
+      }
+
+      const mountsDir = path.join(testRdssDir, '.mounts');
+      if (!isWindows) {
+        expect(fs.existsSync(mountsDir)).toBe(true);
+      } else {
+        expect(fs.existsSync(testRdssDir)).toBe(true);
+      }
+    });
+
+    test('should fail when custom folders file is missing', async () => {
+      const missingFoldersFile = path.join(testRdssDir, 'missing-folders.json');
+      try {
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders-file ${missingFoldersFile} 2>&1`, { stdio: 'pipe' });
+        expect(output.toString()).toContain(`Failed to read or parse ${missingFoldersFile}`);
+      } catch (e: any) {
+        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain(`Failed to read or parse ${missingFoldersFile}`);
+      }
+    });
+
+    test('should use custom base path when --base-path is provided', async () => {
+      // Use an invalid host so it fails to mount reliably, allowing us to inspect the error string
+      const customBasePath = isWindows ? `\\\\invalid-test-host` : `smb://invalid-test-host:445`;
+
+      try {
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --base-path ${customBasePath} --username testuser --password testpass 2>&1`, { stdio: 'pipe' });
+      } catch (e: any) {
+        // Since we are mocking the mount and it might fail, we just make sure the error output
+        // mentions mapping the custom path rather than the default env ones
+        const outputStr = e.stderr?.toString() || e.stdout?.toString() || e.message;
+        const expectedRemote = isWindows ? `${customBasePath}\\test_share` : `${customBasePath}/test_share`;
+        expect(outputStr).toContain(`Error: Failed to map ${expectedRemote}`);
+      }
+    });
+
+    test('should reset all currently mapped folders', async () => {
+      const mountsDir = path.join(testRdssDir, '.mounts');
+      fs.mkdirSync(mountsDir, { recursive: true });
+
+      const fakeTarget = path.join(mountsDir, 'fake');
+      fs.mkdirSync(fakeTarget, { recursive: true });
+      
+      const fakeLocalPath = path.join(testRdssDir, 'FakeShare');
+      if (isWindows) {
+        fs.mkdirSync(fakeLocalPath, { recursive: true });
+      } else {
+        fs.symlinkSync(fakeTarget, fakeLocalPath);
+      }
+
+      try {
+        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --reset`, { stdio: 'pipe' });
+      } catch (e: any) {
+        // Unmounting fake mounts will fail, but the symlinks/folders should still be cleaned up
+      }
+      expect(fs.existsSync(fakeLocalPath)).toBe(false);
     });
 
     test('should assert access to multiple user home directories via smbclient', async () => {

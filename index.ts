@@ -12,7 +12,7 @@ const BASE_PATH_WIN = process.env.BASE_PATH_WIN || '\\\\rstore.qut.edu.au\\Proje
 const BASE_PATH_NIX = process.env.BASE_PATH_NIX || 'smb://rstore.qut.edu.au/projects';
 
 // The local parent directory for mappings
-const RDSS_DIR = path.join(os.homedir(), 'RDSS');
+const BASE_DIR = path.join(os.homedir(), 'RDSS');
 
 interface DriveMapping {
   RPID: string;
@@ -20,26 +20,28 @@ interface DriveMapping {
   nickname?: string;
 }
 
-async function refresh(debug: boolean = false, rdssDir: string = RDSS_DIR, username?: string, password?: string): Promise<void> {
+async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliBasePath?: string): Promise<void> {
   console.log('Refreshing drive mappings...');
   try {
     let folders: DriveMapping[] = [];
+    let configBasePath: string | undefined;
     try {
-      const fileData = fs.readFileSync('folders.json', 'utf8');
+      const fileData = fs.readFileSync(foldersFile, 'utf8');
       const parsedData = JSON.parse(fileData);
       folders = parsedData.folders || [];
+      configBasePath = parsedData.basePath;
     } catch {
-      throw new Error('Failed to read or parse folders.json. Please ensure the file exists and is valid JSON.');
+      throw new Error(`Failed to read or parse ${foldersFile}. Please ensure the file exists and is valid JSON.`);
     }
 
-    const MOUNTS_DIR = path.join(rdssDir, '.mounts');
+    const MOUNTS_DIR = path.join(baseDir, '.mounts');
 
-    if (!fs.existsSync(rdssDir)) {
-      fs.mkdirSync(rdssDir, { recursive: true });
+    if (!fs.existsSync(baseDir)) {
+      fs.mkdirSync(baseDir, { recursive: true });
     } else {
-      const existingItems = fs.readdirSync(rdssDir).filter(item => item !== '.mounts');
+      const existingItems = fs.readdirSync(baseDir).filter(item => item !== '.mounts');
       if (existingItems.length > 0) {
-        reset(debug, rdssDir);
+        reset(debug, baseDir);
       }
     }
 
@@ -47,13 +49,17 @@ async function refresh(debug: boolean = false, rdssDir: string = RDSS_DIR, usern
       fs.mkdirSync(MOUNTS_DIR, { recursive: true });
     }
 
+    const finalBasePath = cliBasePath || configBasePath;
+
     for (const drive of folders) {
-      const remote = isWindows
+      const remote = finalBasePath
+        ? `${finalBasePath}${isWindows ? '\\' : '/'}${drive.RPID}`
+        : isWindows
         ? `${BASE_PATH_WIN}\\${drive.RPID}`
         : `${BASE_PATH_NIX}/${drive.RPID}`;
 
       const folderName = drive.nickname || drive.RPID;
-      const localPath = path.join(rdssDir, folderName);
+      const localPath = path.join(baseDir, folderName);
       const mountPath = isWindows ? localPath : path.join(MOUNTS_DIR, drive.RPID);
 
       let isMounted = false;
@@ -109,13 +115,15 @@ async function refresh(debug: boolean = false, rdssDir: string = RDSS_DIR, usern
           }
         }
       } catch (error: unknown) {
-        console.error(`Warning: Failed to map ${remote} to ${localPath}`);
+        process.exitCode = 1;
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`Error: Failed to map ${remote} to ${localPath}`);
+        console.error(`Reason: ${msg}`);
+        if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
+          console.error(`Command Output: ${String((error as { stderr: unknown }).stderr)}`);
+        }
         if (debug) {
-          const msg = error instanceof Error ? error.message : String(error);
           console.error(`Debug Error: ${msg}`);
-          if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
-            console.error(String((error as { stderr: unknown }).stderr));
-          }
         }
         try {
           if (!isWindows && fs.existsSync(localPath) && fs.lstatSync(localPath).isSymbolicLink()) {
@@ -134,15 +142,16 @@ async function refresh(debug: boolean = false, rdssDir: string = RDSS_DIR, usern
     }
     console.log('Refresh complete.');
   } catch (error: unknown) {
+    process.exitCode = 1;
     const msg = error instanceof Error ? error.message : String(error);
     console.error('Error during refresh:', msg);
   }
 }
 
-function reset(debug: boolean = false, rdssDir: string = RDSS_DIR): void {
+function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
   console.log('Resetting drive mappings...');
-  if (fs.existsSync(rdssDir)) {
-    const MOUNTS_DIR = path.join(rdssDir, '.mounts');
+  if (fs.existsSync(baseDir)) {
+    const MOUNTS_DIR = path.join(baseDir, '.mounts');
 
     if (fs.existsSync(MOUNTS_DIR) && !isWindows) {
       const mounts = fs.readdirSync(MOUNTS_DIR);
@@ -157,13 +166,15 @@ function reset(debug: boolean = false, rdssDir: string = RDSS_DIR): void {
           }
           fs.rmdirSync(mountPath);
         } catch (error: unknown) {
-          console.error(`Warning: Failed to unmount ${mountPath}`);
+          process.exitCode = 1;
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error(`Error: Failed to unmount ${mountPath}`);
+          console.error(`Reason: ${msg}`);
+          if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
+            console.error(`Command Output: ${String((error as { stderr: unknown }).stderr)}`);
+          }
           if (debug) {
-            const msg = error instanceof Error ? error.message : String(error);
             console.error(`Debug Error: ${msg}`);
-            if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
-              console.error(String((error as { stderr: unknown }).stderr));
-            }
           }
         }
       }
@@ -174,10 +185,10 @@ function reset(debug: boolean = false, rdssDir: string = RDSS_DIR): void {
       }
     }
 
-    const folders = fs.readdirSync(rdssDir);
+    const folders = fs.readdirSync(baseDir);
     for (const folder of folders) {
       if (folder === '.mounts') continue;
-      const localPath = path.join(rdssDir, folder);
+      const localPath = path.join(baseDir, folder);
       console.log(`Removing mapping for ${localPath}`);
       try {
         if (isWindows) {
@@ -196,13 +207,15 @@ function reset(debug: boolean = false, rdssDir: string = RDSS_DIR): void {
           }
         }
       } catch (error: unknown) {
-        console.error(`Warning: Failed to remove mapping at ${localPath}`);
+        process.exitCode = 1;
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`Error: Failed to remove mapping at ${localPath}`);
+        console.error(`Reason: ${msg}`);
+        if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
+          console.error(`Command Output: ${String((error as { stderr: unknown }).stderr)}`);
+        }
         if (debug) {
-          const msg = error instanceof Error ? error.message : String(error);
           console.error(`Debug Error: ${msg}`);
-          if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
-            console.error(String((error as { stderr: unknown }).stderr));
-          }
         }
       }
     }
@@ -219,14 +232,16 @@ program
   )
   .option('--reset', 'Remove all currently mapped folders')
   .option('--debug', 'Enable debug logging')
-  .option('--rdss-dir <path>', 'Custom RDSS folder location')
+  .option('--base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
   .option('--username <username>', 'Username for mapping')
   .option('--password <password>', 'Password for mapping')
+  .option('--folders-file <path>', 'Custom folders JSON file location (default: folders.json)')
+  .option('--base-path <path>', 'Custom remote base path')
   .action((options) => {
     if (options.reset) {
-      reset(options.debug, options.rdssDir);
+      reset(options.debug, options.baseDir);
     } else {
-      refresh(options.debug, options.rdssDir, options.username, options.password);
+      refresh(options.debug, options.baseDir, options.username, options.password, options.foldersFile, options.basePath);
     }
   });
 
