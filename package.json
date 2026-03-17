@@ -26,12 +26,14 @@
   "homepage": "https://github.com/eresearchqut/rdss-folder-mapper#readme",
   "dependencies": {
     "@stdlib/string-truncate": "^0.2.3",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "lodash": "^4.17.23"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/commander": "^2.12.0",
     "@types/jest": "^30.0.0",
+    "@types/lodash": "^4.17.24",
     "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",

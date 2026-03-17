@@ -254,7 +254,7 @@ describe('Integration Test', () => {
 
       execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile} --username testuser --password testpass`, { env, stdio: 'pipe' });
 
-      const expectedFolderName = 'test_share - This is a very long title that should...';
+      const expectedFolderName = 'This Is A Very Long Title That Should... [test_share]';
       const localPath = path.join(testRdssDir, expectedFolderName);
       
       expect(fs.existsSync(localPath)).toBe(true);

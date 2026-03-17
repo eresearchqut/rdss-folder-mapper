@@ -4,6 +4,7 @@ import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
 import { Command } from 'commander';
+import { startCase } from 'lodash';
 import truncate from '@stdlib/string-truncate';
 
 const isWindows = os.platform() === 'win32';
@@ -11,6 +12,8 @@ const isMac = os.platform() === 'darwin';
 
 const REMOTE_PATH_WIN = process.env.REMOTE_PATH_WIN || '\\\\rstore.qut.edu.au\\Projects';
 const REMOTE_PATH_NIX = process.env.REMOTE_PATH_NIX || 'smb://rstore.qut.edu.au/projects';
+
+const INVALID_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
 
 // The local parent directory for mappings
 const BASE_DIR = path.join(os.homedir(), 'RDSS');
@@ -59,15 +62,16 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
         ? `${REMOTE_PATH_WIN}\\${drive.id}`
         : `${REMOTE_PATH_NIX}/${drive.id}`;
 
-      let folderName = drive.nickname;
+      let folderName = drive.nickname ? drive.nickname.replace(INVALID_CHARS_REGEX, '') : undefined;
       if (!folderName) {
         if (drive.title) {
-          folderName = truncate(drive.title.replace(/[<>:"/\\|?*\x00-\x1F]/g, ''), truncateLength).trim();
+          const cleanTitle = drive.title.replace(INVALID_CHARS_REGEX, '');
+          folderName = truncate(startCase(cleanTitle), truncateLength).trim();
         } else {
           folderName = drive.id;
         }
       }
-      folderName = `${drive.id} - ${folderName}`;
+      folderName = `${folderName} [${drive.id}]`;
       const localPath = path.join(baseDir, folderName);
       const mountPath = isWindows ? localPath : path.join(MOUNTS_DIR, drive.id);
 
