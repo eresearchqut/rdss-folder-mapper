@@ -41,6 +41,8 @@ Options:
 
 Running the CLI without any options executes the `refresh` command. This reads your local `folders.json` file to retrieve your folder mappings and mounts them under a local parent folder named `RDSS`.
 
+**Note:** The sync process will automatically remove any old drive mappings under the parent `RDSS` folder before creating the new ones.
+
 ```bash
 rdss-rpid-mapper
 ```

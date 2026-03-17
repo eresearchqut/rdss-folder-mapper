@@ -1,4 +1,6 @@
 .junie
 .idea
+.test
 dist
 node_modules
+folders.json

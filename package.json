@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "bin": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "build:ts": "tsc",
     "build:pkg": "pkg . --targets node18-linux-x64,node18-macos-x64,node18-win-x64 --out-path dist",
     "build": "npm run build:ts && npm run build:pkg",
@@ -30,14 +30,18 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/commander": "^2.12.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^25.5.0",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",
     "eslint": "^10.0.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
+    "jest": "^30.3.0",
     "pkg": "^5.8.1",
     "prettier": "^3.8.1",
+    "testcontainers": "^11.12.0",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0"
