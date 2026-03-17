@@ -10,17 +10,27 @@ const isMac = os.platform() === 'darwin';
 
 describe('Integration Test', () => {
   let container: any;
+  const testFilesDir = path.join(process.cwd(), '.smb', 'config');
 
   beforeAll(async () => {
+    const smbConfPath = path.join(testFilesDir, 'smb.conf');
+    const usersConfPath = path.join(testFilesDir, 'users.conf');
+
     container = await new GenericContainer('dockurr/samba')
-      .withEnvironment({
-        USER: 'testuser',
-        PASS: 'testpass',
-        RW: 'true',
-      })
+      .withBindMounts([
+        { source: smbConfPath, target: '/etc/samba/smb.conf' },
+        { source: usersConfPath, target: '/etc/samba/users.conf' },
+      ])
       .withExposedPorts(445)
       .withWaitStrategy(Wait.forLogMessage(/smbd version/i))
       .start();
+
+    // Create test files and set permissions for home directories
+    await container.exec(['mkdir', '-p', '/home/alice', '/home/bob']);
+    await container.exec(['sh', '-c', 'echo "alice_data" > /home/alice/alice_test.txt']);
+    await container.exec(['sh', '-c', 'echo "bob_data" > /home/bob/bob_test.txt']);
+    await container.exec(['chown', '-R', 'alice:smb', '/home/alice']);
+    await container.exec(['chown', '-R', 'bob:smb', '/home/bob']);
   }, 120000);
 
   afterAll(async () => {
@@ -132,6 +142,22 @@ describe('Integration Test', () => {
       } catch (e: any) {
         expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain('Warning: Failed to map');
       }
+    });
+
+    test('should assert access to multiple user home directories via smbclient', async () => {
+      // Assert Alice has access to her home
+      const aliceExec = await container.exec(['smbclient', '//127.0.0.1/alice', '-U', 'alice%alicepass', '-c', 'get alice_test.txt -']);
+      expect(aliceExec.exitCode).toBe(0);
+      expect(aliceExec.output).toContain('alice_data');
+
+      // Assert Bob has access to his home
+      const bobExec = await container.exec(['smbclient', '//127.0.0.1/bob', '-U', 'bob%bobpass', '-c', 'get bob_test.txt -']);
+      expect(bobExec.exitCode).toBe(0);
+      expect(bobExec.output).toContain('bob_data');
+
+      // Assert Alice cannot access Bob's home
+      const aliceDenyExec = await container.exec(['smbclient', '//127.0.0.1/bob', '-U', 'alice%alicepass', '-c', 'ls']);
+      expect(aliceDenyExec.exitCode).not.toBe(0);
     });
   });
 });
