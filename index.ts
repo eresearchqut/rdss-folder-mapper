@@ -21,7 +21,7 @@ interface DriveMapping {
   nickname?: string;
 }
 
-async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string): Promise<void> {
+async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40): Promise<void> {
   console.log('Refreshing drive mappings...');
   try {
     let folders: DriveMapping[] = [];
@@ -62,11 +62,12 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
       let folderName = drive.nickname;
       if (!folderName) {
         if (drive.title) {
-          folderName = truncate(drive.title.replace(/[<>:"/\\|?*\x00-\x1F]/g, ''), 60).trim();
+          folderName = truncate(drive.title.replace(/[<>:"/\\|?*\x00-\x1F]/g, ''), truncateLength).trim();
         } else {
           folderName = drive.id;
         }
       }
+      folderName = `${drive.id} - ${folderName}`;
       const localPath = path.join(baseDir, folderName);
       const mountPath = isWindows ? localPath : path.join(MOUNTS_DIR, drive.id);
 
@@ -245,11 +246,12 @@ program
   .option('-p, --password <password>', 'Password for remote mapping')
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('-r, --remote-path <path>', 'Custom remote path')
+  .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10), 40)
   .action((options) => {
     if (options.reset) {
       reset(options.debug, options.baseDir);
     } else {
-      refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath).then();
+      refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath, options.truncate).then();
     }
   });
 
