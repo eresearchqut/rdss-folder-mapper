@@ -88,15 +88,20 @@ describe('Integration Test', () => {
       if (fs.existsSync('folders.json')) {
         fs.rmSync('folders.json');
       }
+      try {
+        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --reset`, { stdio: 'ignore' });
+      } catch (e) {
+        // ignore
+      }
     });
 
     test('should recreate RDSS folder and run CLI', async () => {
       const host = container.getHost();
       const port = container.getMappedPort(445);
       
-      const basePathWin = `\\\\${host}\\test_share`;
-      // Usually dockurr/samba maps volumes, but we can just use smb://${host}:${port}/test_share
-      const basePathNix = `smb://${host}:${port}/test_share`;
+      const basePathWin = `\\\\${host}`;
+      // Usually dockurr/samba maps volumes, but we can just use smb://${host}:${port}
+      const basePathNix = `smb://${host}:${port}`;
 
       const env = {
         ...process.env,
@@ -104,13 +109,7 @@ describe('Integration Test', () => {
         BASE_PATH_NIX: basePathNix,
       };
 
-      try {
-        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --username testuser --password testpass`, { env, stdio: 'pipe' });
-      } catch (e: any) {
-        // It might fail to mount if the OS doesn't support mounting or needs sudo
-        // We'll just verify the CLI creates the folders
-        console.log('CLI execution failed/warned:', e.stderr?.toString() || e.message);
-      }
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --username testuser --password testpass`, { env, stdio: 'pipe' });
 
       // Verify that the CLI started to create the mapping
       // Since mounting might fail in CI/local depending on perms, we mainly check if the .test/RDSS directory has the expected structures
@@ -127,8 +126,8 @@ describe('Integration Test', () => {
       const host = container.getHost();
       const port = container.getMappedPort(445);
       
-      const basePathWin = `\\\\${host}\\test_share`;
-      const basePathNix = `smb://${host}:${port}/test_share`;
+      const basePathWin = `\\\\${host}`;
+      const basePathNix = `smb://${host}:${port}`;
 
       const env = {
         ...process.env,
@@ -159,15 +158,15 @@ describe('Integration Test', () => {
       fs.writeFileSync(
         customFoldersFile,
         JSON.stringify({
-          folders: [{ RPID: 'custom_share', nickname: 'CustomShare' }],
+          folders: [{ RPID: 'test_share', nickname: 'CustomShare' }],
         })
       );
 
       const host = container.getHost();
       const port = container.getMappedPort(445);
       
-      const basePathWin = `\\\\${host}\\custom_share`;
-      const basePathNix = `smb://${host}:${port}/custom_share`;
+      const basePathWin = `\\\\${host}`;
+      const basePathNix = `smb://${host}:${port}`;
 
       const env = {
         ...process.env,
@@ -175,11 +174,7 @@ describe('Integration Test', () => {
         BASE_PATH_NIX: basePathNix,
       };
 
-      try {
-        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders-file ${customFoldersFile}`, { env, stdio: 'pipe' });
-      } catch (e: any) {
-        // ignore mount errors
-      }
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders-file ${customFoldersFile} --username testuser --password testpass`, { env, stdio: 'pipe' });
 
       const mountsDir = path.join(testRdssDir, '.mounts');
       if (!isWindows) {
@@ -228,11 +223,7 @@ describe('Integration Test', () => {
         fs.symlinkSync(fakeTarget, fakeLocalPath);
       }
 
-      try {
-        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --reset`, { stdio: 'pipe' });
-      } catch (e: any) {
-        // Unmounting fake mounts will fail, but the symlinks/folders should still be cleaned up
-      }
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --reset`, { stdio: 'pipe' });
       expect(fs.existsSync(fakeLocalPath)).toBe(false);
     });
 
