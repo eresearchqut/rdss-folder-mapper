@@ -20,21 +20,6 @@ interface DriveMapping {
   nickname?: string;
 }
 
-function isPathMounted(checkPath: string): boolean {
-  try {
-    if (isWindows) {
-      const stat = fs.lstatSync(checkPath);
-      return stat.isSymbolicLink();
-    } else {
-      const mountOutput = execSync('mount', { encoding: 'utf8' });
-      const lines = mountOutput.split('\n');
-      return lines.some(line => line.includes(` on ${checkPath} `) || line.includes(` on ${checkPath} (`));
-    }
-  } catch {
-    return false;
-  }
-}
-
 async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliBasePath?: string): Promise<void> {
   console.log('Refreshing drive mappings...');
   try {
@@ -77,7 +62,19 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
       const localPath = path.join(baseDir, folderName);
       const mountPath = isWindows ? localPath : path.join(MOUNTS_DIR, drive.RPID);
 
-      let isMounted = isPathMounted(isWindows ? localPath : mountPath);
+      let isMounted = false;
+      try {
+        if (isWindows) {
+          const stat = fs.lstatSync(localPath);
+          isMounted = stat.isSymbolicLink();
+        } else {
+          const mountOutput = execSync('mount', { encoding: 'utf8' });
+          const lines = mountOutput.split('\n');
+          isMounted = lines.some(line => line.includes(` on ${mountPath} `) || line.includes(` on ${mountPath} (`));
+        }
+      } catch {
+        // Does not exist
+      }
 
       if (isMounted) {
         if (debug) {
@@ -162,12 +159,10 @@ function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
         const mountPath = path.join(MOUNTS_DIR, mountFolder);
         console.log(`Unmounting ${mountPath}`);
         try {
-          if (isPathMounted(mountPath)) {
-            if (isMac) {
-              execSync(`umount "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
-            } else {
-              execSync(`sudo umount "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
-            }
+          if (isMac) {
+            execSync(`umount "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
+          } else {
+            execSync(`sudo umount "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
           }
           fs.rmdirSync(mountPath);
         } catch (error: unknown) {
@@ -194,14 +189,6 @@ function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
     for (const folder of folders) {
       if (folder === '.mounts') continue;
       const localPath = path.join(baseDir, folder);
-      
-      try {
-        const stat = fs.lstatSync(localPath);
-        if (!stat.isDirectory() && !stat.isSymbolicLink()) continue;
-      } catch {
-        continue;
-      }
-
       console.log(`Removing mapping for ${localPath}`);
       try {
         if (isWindows) {
@@ -211,12 +198,10 @@ function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
           if (stat.isSymbolicLink()) {
             fs.unlinkSync(localPath);
           } else {
-            if (isPathMounted(localPath)) {
-              if (isMac) {
-                execSync(`umount "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
-              } else {
-                execSync(`sudo umount "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
-              }
+            if (isMac) {
+              execSync(`umount "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
+            } else {
+              execSync(`sudo umount "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
             }
             fs.rmdirSync(localPath);
           }
@@ -250,13 +235,13 @@ program
   .option('--base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
   .option('--username <username>', 'Username for mapping')
   .option('--password <password>', 'Password for mapping')
-  .option('--folders-file <path>', 'Custom folders JSON file location (default: folders.json)')
+  .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('--base-path <path>', 'Custom remote base path')
   .action((options) => {
     if (options.reset) {
       reset(options.debug, options.baseDir);
     } else {
-      refresh(options.debug, options.baseDir, options.username, options.password, options.foldersFile, options.basePath);
+      refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.basePath);
     }
   });
 
