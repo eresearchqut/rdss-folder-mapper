@@ -33,8 +33,15 @@ A cross-platform command-line interface (CLI) tool that allows you to create
 local folder mappings to shared network drives effortlessly.
 
 Options:
-  --reset     Remove all currently mapped folders
-  -h, --help  display help for command
+  --reset                    Remove all currently mapped folders
+  --debug                    Enable debug logging
+  -b, --base-dir <path>      Custom base folder location (default: ~/RDSS)
+  -u --username <username>   Username for remote mapping
+  -p, --password <password>  Password for remote mapping
+  -f, --folders <path>       Custom folders JSON file location (default:
+                             folders.json)
+  -r, --remote-path <path>   Custom remote path
+  -h, --help                 display help for command
 ```
 
 ### Refresh (Default)
