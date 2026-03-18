@@ -151,13 +151,15 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
             try { fs.rmdirSync(localPath); } catch {}
           }
           if (username && password) {
-            execSync(`net use "${remote}" "${password}" /user:"${username}"`, { stdio: debug ? 'pipe' : 'ignore' });
+            const userWithDomain = domain ? `${domain}\\${username}` : username;
+            execSync(`net use "${remote}" "${password}" /user:"${userWithDomain}"`, { stdio: debug ? 'pipe' : 'ignore' });
           }
           execSync(`mklink /D "${localPath}" "${remote}"`, { stdio: debug ? 'pipe' : 'ignore' });
         } else if (isMac) {
           let macRemote = remote;
           if (username && password && macRemote.startsWith('smb://')) {
-            macRemote = macRemote.replace('smb://', `smb://${encodeURIComponent(username)}:${encodeURIComponent(password)}@`);
+            const domainPrefix = domain ? `${encodeURIComponent(domain)};` : '';
+            macRemote = macRemote.replace('smb://', `smb://${domainPrefix}${encodeURIComponent(username)}:${encodeURIComponent(password)}@`);
           }
           execSync(`mount_smbfs "${macRemote}" "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
           if (!fs.existsSync(localPath)) {
