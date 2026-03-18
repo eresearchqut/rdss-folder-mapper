@@ -107,9 +107,11 @@ describe('Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        RDSS_USERNAME: 'testuser',
+        RDSS_PASSWORD: 'testpass',
       };
 
-      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --username testuser --password testpass`, { env, stdio: 'pipe' });
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir}`, { env, stdio: 'pipe' });
 
       // Verify that the CLI started to create the mapping
       // Since mounting might fail in CI/local depending on perms, we mainly check if the .test/RDSS directory has the expected structures
@@ -133,10 +135,12 @@ describe('Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        RDSS_USERNAME: 'testuser',
+        RDSS_PASSWORD: 'testpass',
       };
 
       try {
-        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --username wronguser --password wrongpass 2>&1`, { env, stdio: 'pipe' });
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} 2>&1`, { env, stdio: 'pipe' });
         expect(output.toString()).toContain('Error: Failed to map');
       } catch (e: any) {
         expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain('Error: Failed to map');
@@ -172,9 +176,11 @@ describe('Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        RDSS_USERNAME: 'testuser',
+        RDSS_PASSWORD: 'testpass',
       };
 
-      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile} --username testuser --password testpass`, { env, stdio: 'pipe' });
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile}`, { env, stdio: 'pipe' });
 
       const mountsDir = path.join(testRdssDir, '.mounts');
       if (!isWindows) {
@@ -197,9 +203,10 @@ describe('Integration Test', () => {
     test('should use custom remote path when --remote-path is provided', async () => {
       // Use an invalid host so it fails to mount reliably, allowing us to inspect the error string
       const customRemotePath = isWindows ? `\\\\invalid-test-host` : `smb://invalid-test-host:445`;
+      const env = { ...process.env, RDSS_USERNAME: 'testuser', RDSS_PASSWORD: 'testpass' };
 
       try {
-        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --remote-path ${customRemotePath} --username testuser --password testpass 2>&1`, { stdio: 'pipe' });
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --remote-path ${customRemotePath} 2>&1`, { env, stdio: 'pipe' });
       } catch (e: any) {
         // Since we are mocking the mount and it might fail, we just make sure the error output
         // mentions mapping the custom path rather than the default env ones
@@ -250,9 +257,11 @@ describe('Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        RDSS_USERNAME: 'testuser',
+        RDSS_PASSWORD: 'testpass',
       };
 
-      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile} --username testuser --password testpass`, { env, stdio: 'pipe' });
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile}`, { env, stdio: 'pipe' });
 
       const expectedFolderName = 'This Is A Very Long Title That Should... [test_share]';
       const localPath = path.join(testRdssDir, expectedFolderName);

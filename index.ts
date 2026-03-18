@@ -144,7 +144,19 @@ function clearCredentialsFromKeychain(debug: boolean): void {
   }
 }
 
-async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40, domain?: string): Promise<void> {
+interface RefreshOptions {
+  debug?: boolean;
+  baseDir?: string;
+  username?: string;
+  password?: string;
+  foldersFile?: string;
+  cliRemotePath?: string;
+  truncateLength?: number;
+  domain?: string;
+}
+
+async function refresh(options: RefreshOptions = {}): Promise<void> {
+  let { debug = false, baseDir = BASE_DIR, username, password, foldersFile = 'folders.json', cliRemotePath, truncateLength = 40, domain } = options;
   console.log('Refreshing drive mappings...');
   try {
     if (!username || !password || !domain) {
@@ -328,7 +340,7 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
 }
 
 function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
-  console.log('Resetting drive mappings...');
+  console.log('Resetting folder mappings...');
   if (fs.existsSync(baseDir)) {
     const MOUNTS_DIR = path.join(baseDir, '.mounts');
 
@@ -407,18 +419,25 @@ const program = new Command();
 program
   .name('rdss-folder-mapper')
   .description(
-    'A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network drives effortlessly.',
+    'A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network folders effortlessly.',
   )
   .option('--debug', 'Enable debug logging')
   .option('-b, --base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
-  .option('-u --username <username>', 'Username for remote mapping')
-  .option('-p, --password <password>', 'Password for remote mapping')
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('-r, --remote-path <path>', 'Custom remote path')
   .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10), 40)
   .option('-d, --domain <domain>', 'Domain for remote mapping')
   .action((options) => {
-    refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath, options.truncate, options.domain).then();
+    refresh({
+      debug: options.debug,
+      baseDir: options.baseDir,
+      username: process.env.RDSS_USERNAME,
+      password: process.env.RDSS_PASSWORD,
+      foldersFile: options.folders,
+      cliRemotePath: options.remotePath,
+      truncateLength: options.truncate,
+      domain: options.domain
+    }).then();
   });
 
 program

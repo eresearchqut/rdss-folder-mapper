@@ -97,8 +97,6 @@ local folder mappings to shared network drives effortlessly.
 Options:
   --debug                    Enable debug logging
   -b, --base-dir <path>      Custom base folder location (default: ~/RDSS)
-  -u --username <username>   Username for remote mapping
-  -p, --password <password>  Password for remote mapping
   -f, --folders <path>       Custom folders JSON file location (default:
                              folders.json)
   -r, --remote-path <path>   Custom remote path
