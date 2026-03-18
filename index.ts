@@ -2,10 +2,11 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { Command } from 'commander';
 import { startCase } from 'lodash';
 import truncate from '@stdlib/string-truncate';
+import readlineSync from 'readline-sync';
 
 const isWindows = os.platform() === 'win32';
 const isMac = os.platform() === 'darwin';
@@ -71,6 +72,49 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
     }
   }
   return {};
+}
+
+function saveCredentialsToKeychain(creds: { username?: string; password?: string; domain?: string }, debug: boolean): void {
+  const username = creds.username || '';
+  const pass = creds.password || '';
+  const domain = creds.domain || '';
+
+  if (isMac) {
+    try {
+      if (debug) console.log('Saving credentials to macOS keychain...');
+      const args = [
+        'add-generic-password',
+        '-s', 'rdss-folder-mapper',
+        '-a', username || 'rdss-user',
+        '-w', pass,
+        '-U'
+      ];
+      if (domain) {
+        args.push('-j', domain);
+      }
+      execFileSync('security', args, { stdio: debug ? 'pipe' : 'ignore' });
+    } catch (e) {
+      if (debug) console.log('Failed to save to macOS keychain:', (e as Error).message);
+    }
+  } else if (!isWindows) {
+    try {
+      if (debug) console.log('Saving credentials to Linux secret-tool...');
+      const args = [
+        'store',
+        '--label=RDSS Folder Mapper',
+        'service', 'rdss-folder-mapper',
+        'username', username || 'rdss-user'
+      ];
+      if (domain) {
+        args.push('domain', domain);
+      }
+      execFileSync('secret-tool', args, { input: pass, stdio: ['pipe', debug ? 'pipe' : 'ignore', debug ? 'pipe' : 'ignore'] });
+    } catch (e) {
+      if (debug) console.log('Failed to save to Linux secret-tool:', (e as Error).message);
+    }
+  } else {
+    if (debug) console.log('Keychain storage is not supported on Windows.');
+  }
 }
 
 async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40, domain?: string): Promise<void> {
@@ -344,6 +388,34 @@ program
     } else {
       refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath, options.truncate, options.domain).then();
     }
+  });
+
+program
+  .command('set <key>')
+  .description('Set a credential in the keychain (username, domain, or password)')
+  .action((key) => {
+    const validKeys = ['username', 'domain', 'password'];
+    if (!validKeys.includes(key)) {
+      console.error(`Invalid key: ${key}. Valid options are: ${validKeys.join(', ')}`);
+      process.exit(1);
+    }
+
+    if (isWindows) {
+      console.error('Keychain storage is not supported on Windows.');
+      process.exit(1);
+    }
+
+    const isPassword = key === 'password';
+    const value = readlineSync.question(`Enter value for ${key}: `, {
+      hideEchoBack: isPassword
+    });
+
+    const debug = program.opts().debug || false;
+    const currentCreds = getCredentialsFromKeychain(debug);
+    const newCreds = { ...currentCreds, [key]: value };
+
+    saveCredentialsToKeychain(newCreds, debug);
+    console.log(`Successfully updated ${key} in keychain.`);
   });
 
 program.parse(process.argv);
