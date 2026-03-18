@@ -126,8 +126,12 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
             fs.symlinkSync(mountPath, localPath);
           }
         } else {
+          let linuxRemote = remote;
+          if (linuxRemote.startsWith('smb://')) {
+            linuxRemote = linuxRemote.replace('smb://', '//');
+          }
           const mountOpts = (username && password) ? `username=${username},password=${password}` : `guest`;
-          execSync(`sudo mount -t cifs -o ${mountOpts} "${remote}" "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
+          execSync(`sudo mount -t cifs -o ${mountOpts} "${linuxRemote}" "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
           if (!fs.existsSync(localPath)) {
             fs.symlinkSync(mountPath, localPath);
           }
