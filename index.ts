@@ -506,6 +506,9 @@ const processDriveMapping = ({
     } else {
       mountLinux({ remote, localPath, mountPath, username, password, domain, debug });
     }
+    if (debug) {
+      console.log(`Debug: Successfully mounted ${remote} to ${localPath}`);
+    }
   } catch (error: unknown) {
     handleMountError(error, remote, localPath, mountPath, password, debug);
   }
