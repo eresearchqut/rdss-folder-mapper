@@ -152,15 +152,22 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
           }
           if (username && password) {
             const userWithDomain = domain ? `${domain}\\${username}` : username;
-            execSync(`net use "${remote}" "${password}" /user:"${userWithDomain}"`, { stdio: debug ? 'pipe' : 'ignore' });
+            const cmd = `net use "${remote}" "${password}" /user:"${userWithDomain}"`;
+            if (debug) console.log(`Executing: net use "${remote}" "***" /user:"${userWithDomain}"`);
+            execSync(cmd, { stdio: debug ? 'pipe' : 'ignore' });
           }
-          execSync(`mklink /D "${localPath}" "${remote}"`, { stdio: debug ? 'pipe' : 'ignore' });
+          const mklinkCmd = `mklink /D "${localPath}" "${remote}"`;
+          if (debug) console.log(`Executing: ${mklinkCmd}`);
+          execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
         } else if (isMac) {
           let macRemote = remote;
+          let macRemoteLog = remote;
           if (username && password && macRemote.startsWith('smb://')) {
             const domainPrefix = domain ? `${encodeURIComponent(domain)};` : '';
             macRemote = macRemote.replace('smb://', `smb://${domainPrefix}${encodeURIComponent(username)}:${encodeURIComponent(password)}@`);
+            macRemoteLog = macRemoteLog.replace('smb://', `smb://${domainPrefix}${encodeURIComponent(username)}:***@`);
           }
+          if (debug) console.log(`Executing: mount_smbfs "${macRemoteLog}" "${mountPath}"`);
           execSync(`mount_smbfs "${macRemote}" "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
           if (!fs.existsSync(localPath)) {
             fs.symlinkSync(mountPath, localPath);
@@ -171,6 +178,8 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
             linuxRemote = linuxRemote.replace('smb://', '//');
           }
           const mountOpts = (username && password) ? `username=${username},password=${password},domain=${domain}` : `guest`;
+          const mountOptsLog = (username && password) ? `username=${username},password=***,domain=${domain}` : `guest`;
+          if (debug) console.log(`Executing: sudo mount -t cifs -o ${mountOptsLog} "${linuxRemote}" "${mountPath}"`);
           execSync(`sudo mount -t cifs -o ${mountOpts} "${linuxRemote}" "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
           if (!fs.existsSync(localPath)) {
             fs.symlinkSync(mountPath, localPath);
