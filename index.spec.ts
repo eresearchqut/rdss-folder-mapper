@@ -5,7 +5,9 @@ import path from 'path';
 import { execSync } from 'child_process';
 import os from 'os';
 
-const isWindows = os.platform() === 'win32';
+function isWindows() {
+  return os.platform() === 'win32';
+}
 
 describe('Integration Test', () => {
   let container: StartedTestContainer;
@@ -116,7 +118,7 @@ describe('Integration Test', () => {
       // Since mounting might fail in CI/local depending on perms, we mainly check if the .test/RDSS directory has the expected structures
       const mountsDir = path.join(testRdssDir, '.mounts');
 
-      if (!isWindows) {
+      if (!isWindows()) {
         expect(fs.existsSync(mountsDir)).toBe(true);
       } else {
         expect(fs.existsSync(testRdssDir)).toBe(true);
@@ -196,7 +198,7 @@ describe('Integration Test', () => {
       });
 
       const mountsDir = path.join(testRdssDir, '.mounts');
-      if (!isWindows) {
+      if (!isWindows()) {
         expect(fs.existsSync(mountsDir)).toBe(true);
       } else {
         expect(fs.existsSync(testRdssDir)).toBe(true);
@@ -221,7 +223,9 @@ describe('Integration Test', () => {
 
     test('should use custom remote path when --remote-path is provided', async () => {
       // Use an invalid host so it fails to mount reliably, allowing us to inspect the error string
-      const customRemotePath = isWindows ? '\\\\invalid-test-host' : 'smb://invalid-test-host:445';
+      const customRemotePath = isWindows()
+        ? '\\\\invalid-test-host'
+        : 'smb://invalid-test-host:445';
       const env = { ...process.env, RDSS_USERNAME: 'testuser', RDSS_PASSWORD: 'testpass' };
 
       try {
@@ -235,7 +239,7 @@ describe('Integration Test', () => {
         // Since we are mocking the mount and it might fail, we just make sure the error output
         // mentions mapping the custom path rather than the default env ones
         const outputStr = e.stderr?.toString() || e.stdout?.toString() || e.message;
-        const expectedRemote = isWindows
+        const expectedRemote = isWindows()
           ? `${customRemotePath}\\test_share`
           : `${customRemotePath}/test_share`;
         expect(outputStr).toContain(`Error: Failed to map ${expectedRemote}`);
@@ -250,7 +254,7 @@ describe('Integration Test', () => {
       fs.mkdirSync(fakeTarget, { recursive: true });
 
       const fakeLocalPath = path.join(testRdssDir, 'FakeShare');
-      if (isWindows) {
+      if (isWindows()) {
         fs.mkdirSync(fakeLocalPath, { recursive: true });
       } else {
         fs.symlinkSync(fakeTarget, fakeLocalPath);
