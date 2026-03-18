@@ -17,7 +17,23 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 
 ## Installation
 
-You can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
+### macOS & Linux
+
+You can install the latest release directly using the installation script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.sh | sh
+```
+
+### Windows
+
+You can install the latest release using PowerShell:
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.ps1 -OutFile install.ps1; .\install.ps1
+```
+
+Alternatively, you can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
 
 Available binaries:
 - [🪟 Windows (`rdss-folder-mapper-win.exe`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe)
