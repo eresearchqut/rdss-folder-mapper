@@ -36,8 +36,7 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-folde
 Or using Command Prompt (`cmd`):
 
 ```cmd
-certutil -urlcache -split -f "https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.cmd" install.cmd
-install.cmd
+certutil -urlcache -split -f "https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe" rdss-folder-mapper.exe
 ```
 
 Alternatively, you can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
