@@ -5,9 +5,9 @@ import path from 'path';
 import { execSync } from 'child_process';
 import os from 'os';
 
-function isWindows() {
+const isWindows = () => {
   return os.platform() === 'win32';
-}
+};
 
 describe('Integration Test', () => {
   let container: StartedTestContainer;

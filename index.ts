@@ -8,14 +8,14 @@ import { startCase } from 'lodash';
 import truncate from '@stdlib/string-truncate';
 import readlineSync from 'readline-sync';
 
-export function isWindows() {
+export const isWindows = () => {
   return os.platform() === 'win32';
-}
-export function isMac() {
+};
+export const isMac = () => {
   return os.platform() === 'darwin';
-}
+};
 
-export function isMounted(localPath: string, mountPath: string): boolean {
+export const isMounted = (localPath: string, mountPath: string): boolean => {
   try {
     if (isWindows()) {
       const stat = fs.lstatSync(localPath);
@@ -30,16 +30,16 @@ export function isMounted(localPath: string, mountPath: string): boolean {
   } catch {
     return false;
   }
-}
+};
 
-export function isExistingFolder(localPath: string): boolean {
+export const isExistingFolder = (localPath: string): boolean => {
   try {
     const stat = fs.lstatSync(localPath);
     return !stat.isSymbolicLink() && stat.isDirectory();
   } catch {
     return false;
   }
-}
+};
 
 const REMOTE_PATH_WIN = process.env.REMOTE_PATH_WIN || '\\\\rstore.qut.edu.au\\Projects';
 const REMOTE_PATH_NIX = process.env.REMOTE_PATH_NIX || 'smb://rstore.qut.edu.au/projects';
@@ -56,7 +56,7 @@ interface DriveMapping {
   nickname?: string;
 }
 
-function getMacCredentials(debug: boolean) {
+const getMacCredentials = (debug: boolean) => {
   try {
     if (debug) console.log('Attempting to read credentials from macOS keychain...');
     // Note: `security` writes the password to stderr, and attributes to stdout. We catch both by not redirecting stderr to ignore.
@@ -87,9 +87,9 @@ function getMacCredentials(debug: boolean) {
     if (debug) console.log('Failed to read from macOS keychain:', (e as Error).message);
   }
   return {};
-}
+};
 
-function getLinuxCredentials(debug: boolean) {
+const getLinuxCredentials = (debug: boolean) => {
   try {
     if (debug) console.log('Attempting to read credentials from Linux secret-tool...');
     const searchOutput = execSync('secret-tool search --all service rdss-folder-mapper', {
@@ -117,25 +117,27 @@ function getLinuxCredentials(debug: boolean) {
     if (debug) console.log('Failed to read from Linux secret-tool:', (e as Error).message);
   }
   return {};
-}
+};
 
-function getCredentialsFromKeychain(debug: boolean): {
+const getCredentialsFromKeychain = (
+  debug: boolean,
+): {
   username?: string;
   password?: string;
   domain?: string;
-} {
+} => {
   if (isMac()) {
     return getMacCredentials(debug);
   } else if (!isWindows()) {
     return getLinuxCredentials(debug);
   }
   return {};
-}
+};
 
-function saveMacCredentials(
+const saveMacCredentials = (
   creds: { username?: string; password?: string; domain?: string },
   debug: boolean,
-): void {
+): void => {
   try {
     if (debug) console.log('Saving credentials to macOS keychain...');
     const args = ['add-generic-password', '-s', 'rdss-folder-mapper', '-U'];
@@ -157,12 +159,12 @@ function saveMacCredentials(
     }
     if (debug) console.log('Failed to save to macOS keychain:', msg);
   }
-}
+};
 
-function saveLinuxCredentials(
+const saveLinuxCredentials = (
   creds: { username?: string; password?: string; domain?: string },
   debug: boolean,
-): void {
+): void => {
   try {
     if (debug) console.log('Saving credentials to Linux secret-tool...');
     const args = ['store', '--label=RDSS Folder Mapper', 'service', 'rdss-folder-mapper'];
@@ -179,12 +181,12 @@ function saveLinuxCredentials(
   } catch (e) {
     if (debug) console.log('Failed to save to Linux secret-tool:', (e as Error).message);
   }
-}
+};
 
-function saveCredentialsToKeychain(
+const saveCredentialsToKeychain = (
   creds: { username?: string; password?: string; domain?: string },
   debug: boolean,
-): void {
+): void => {
   if (isMac()) {
     saveMacCredentials(creds, debug);
   } else if (!isWindows()) {
@@ -192,9 +194,9 @@ function saveCredentialsToKeychain(
   } else {
     if (debug) console.log('Keychain storage is not supported on Windows.');
   }
-}
+};
 
-function clearMacCredentials(debug: boolean): void {
+const clearMacCredentials = (debug: boolean): void => {
   try {
     if (debug) console.log('Clearing credentials from macOS keychain...');
     execSync('security delete-generic-password -s "rdss-folder-mapper"', {
@@ -203,9 +205,9 @@ function clearMacCredentials(debug: boolean): void {
   } catch (e) {
     if (debug) console.log('Failed to clear macOS keychain:', (e as Error).message);
   }
-}
+};
 
-function clearLinuxCredentials(debug: boolean): void {
+const clearLinuxCredentials = (debug: boolean): void => {
   try {
     if (debug) console.log('Clearing credentials from Linux secret-tool...');
     execSync('secret-tool clear service rdss-folder-mapper', {
@@ -214,9 +216,9 @@ function clearLinuxCredentials(debug: boolean): void {
   } catch (e) {
     if (debug) console.log('Failed to clear Linux secret-tool:', (e as Error).message);
   }
-}
+};
 
-function clearCredentialsFromKeychain(debug: boolean): void {
+const clearCredentialsFromKeychain = (debug: boolean): void => {
   if (isMac()) {
     clearMacCredentials(debug);
   } else if (!isWindows()) {
@@ -224,7 +226,7 @@ function clearCredentialsFromKeychain(debug: boolean): void {
   } else {
     if (debug) console.log('Keychain storage is not supported on Windows.');
   }
-}
+};
 
 interface RefreshOptions {
   debug?: boolean;
@@ -242,11 +244,13 @@ interface ConfigData {
   remotePath?: string;
 }
 
-function resolveCredentials(options: RefreshOptions): {
+const resolveCredentials = (
+  options: RefreshOptions,
+): {
   username?: string;
   password?: string;
   domain: string;
-} {
+} => {
   let { username, password, domain } = options;
   if (!username || !password || !domain) {
     const keychainCreds = getCredentialsFromKeychain(options.debug || false);
@@ -261,9 +265,9 @@ function resolveCredentials(options: RefreshOptions): {
       console.log(`No username provided, defaulting to executing user: ${username}`);
   }
   return { username, password, domain };
-}
+};
 
-function loadFoldersConfig(foldersFile: string): ConfigData {
+const loadFoldersConfig = (foldersFile: string): ConfigData => {
   try {
     const fileData = fs.readFileSync(foldersFile, 'utf8');
     const parsedData = JSON.parse(fileData);
@@ -276,9 +280,9 @@ function loadFoldersConfig(foldersFile: string): ConfigData {
       `Failed to read or parse ${foldersFile}. Please ensure the file exists and is valid JSON.`,
     );
   }
-}
+};
 
-function setupBaseDirectory(baseDir: string, debug: boolean): string {
+const setupBaseDirectory = (baseDir: string, debug: boolean): string => {
   const mountsDir = path.join(baseDir, '.mounts');
   if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir, { recursive: true });
@@ -292,9 +296,9 @@ function setupBaseDirectory(baseDir: string, debug: boolean): string {
     fs.mkdirSync(mountsDir, { recursive: true });
   }
   return mountsDir;
-}
+};
 
-function getFolderName(drive: DriveMapping, truncateLength: number): string {
+const getFolderName = (drive: DriveMapping, truncateLength: number): string => {
   let folderName = drive.nickname ? drive.nickname.replace(INVALID_CHARS_REGEX, '') : undefined;
   if (!folderName) {
     if (drive.title) {
@@ -305,18 +309,18 @@ function getFolderName(drive: DriveMapping, truncateLength: number): string {
     }
   }
   return `${folderName} [${drive.id}]`;
-}
+};
 
-function sanitizeErrorMessage(error: unknown, password?: string): string {
+const sanitizeErrorMessage = (error: unknown, password?: string): string => {
   let msg = error instanceof Error ? error.message : String(error);
   if (password) {
     msg = msg.split(password).join('***');
     msg = msg.split(encodeURIComponent(password)).join('***');
   }
   return msg;
-}
+};
 
-function sanitizeStderr(error: unknown, password?: string): string | undefined {
+const sanitizeStderr = (error: unknown, password?: string): string | undefined => {
   if (
     error &&
     typeof error === 'object' &&
@@ -331,16 +335,16 @@ function sanitizeStderr(error: unknown, password?: string): string | undefined {
     return stderrMsg;
   }
   return undefined;
-}
+};
 
-function handleMountError(
+const handleMountError = (
   error: unknown,
   remote: string,
   localPath: string,
   mountPath: string,
   password?: string,
   debug: boolean = false,
-) {
+) => {
   process.exitCode = 1;
   const msg = sanitizeErrorMessage(error, password);
   console.error(`Error: Failed to map ${remote} to ${localPath}`);
@@ -368,7 +372,7 @@ function handleMountError(
   } catch {
     // Ignore errors during cleanup
   }
-}
+};
 
 interface MountOptions {
   remote: string;
@@ -380,7 +384,7 @@ interface MountOptions {
   debug?: boolean;
 }
 
-function mountWindows(options: MountOptions) {
+const mountWindows = (options: MountOptions) => {
   const { remote, localPath, username, password, domain, debug = false } = options;
   const existingIsFolder = isExistingFolder(localPath);
   if (existingIsFolder) {
@@ -399,9 +403,9 @@ function mountWindows(options: MountOptions) {
   const mklinkCmd = `mklink /D "${localPath}" "${remote}"`;
   if (debug) console.log(`Executing: ${mklinkCmd}`);
   execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
-}
+};
 
-function mountMac(options: MountOptions) {
+const mountMac = (options: MountOptions) => {
   const { remote, localPath, mountPath, username, password, domain, debug = false } = options;
   let macRemote = remote;
   let macRemoteLog = remote;
@@ -423,9 +427,9 @@ function mountMac(options: MountOptions) {
   if (!fs.existsSync(localPath)) {
     fs.symlinkSync(mountPath, localPath);
   }
-}
+};
 
-function mountLinux(options: MountOptions) {
+const mountLinux = (options: MountOptions) => {
   const { remote, localPath, mountPath, username, password, domain, debug = false } = options;
   let linuxRemote = remote;
   if (linuxRemote.startsWith('smb://')) {
@@ -443,7 +447,7 @@ function mountLinux(options: MountOptions) {
   if (!fs.existsSync(localPath)) {
     fs.symlinkSync(mountPath, localPath);
   }
-}
+};
 
 interface ProcessDriveMappingOptions {
   drive: DriveMapping;
@@ -457,7 +461,7 @@ interface ProcessDriveMappingOptions {
   debug?: boolean;
 }
 
-function processDriveMapping({
+const processDriveMapping = ({
   drive,
   baseDir,
   mountsDir,
@@ -467,7 +471,7 @@ function processDriveMapping({
   password,
   domain,
   debug = false,
-}: ProcessDriveMappingOptions) {
+}: ProcessDriveMappingOptions) => {
   const remote = finalRemotePath
     ? `${finalRemotePath}${isWindows() ? '\\' : '/'}${drive.id}`
     : isWindows()
@@ -505,9 +509,9 @@ function processDriveMapping({
   } catch (error: unknown) {
     handleMountError(error, remote, localPath, mountPath, password, debug);
   }
-}
+};
 
-export async function refresh(options: RefreshOptions = {}): Promise<void> {
+export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
   const {
     debug = false,
     baseDir = BASE_DIR,
@@ -543,9 +547,9 @@ export async function refresh(options: RefreshOptions = {}): Promise<void> {
     const msg = sanitizeErrorMessage(error, options.password);
     console.error('Error during refresh:', msg);
   }
-}
+};
 
-function handleUnmountError(error: unknown, pathName: string, debug: boolean) {
+const handleUnmountError = (error: unknown, pathName: string, debug: boolean) => {
   process.exitCode = 1;
   const msg = error instanceof Error ? error.message : String(error);
   console.error(`Error: Failed to unmount or remove ${pathName}`);
@@ -557,9 +561,9 @@ function handleUnmountError(error: unknown, pathName: string, debug: boolean) {
   if (debug) {
     console.error(`Debug Error: ${msg}`);
   }
-}
+};
 
-function resetMountsDir(mountsDir: string, debug: boolean) {
+const resetMountsDir = (mountsDir: string, debug: boolean) => {
   if (fs.existsSync(mountsDir) && !isWindows()) {
     const mounts = fs.readdirSync(mountsDir);
     for (const mountFolder of mounts) {
@@ -582,9 +586,9 @@ function resetMountsDir(mountsDir: string, debug: boolean) {
       // Ignore
     }
   }
-}
+};
 
-function resetBaseDirMappings(baseDir: string, debug: boolean) {
+const resetBaseDirMappings = (baseDir: string, debug: boolean) => {
   const folders = fs.readdirSync(baseDir);
   for (const folder of folders) {
     if (folder === '.mounts') continue;
@@ -610,9 +614,9 @@ function resetBaseDirMappings(baseDir: string, debug: boolean) {
       handleUnmountError(error, localPath, debug);
     }
   }
-}
+};
 
-export function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
+export const reset = (debug: boolean = false, baseDir: string = BASE_DIR): void => {
   console.log('Resetting folder mappings...');
   if (fs.existsSync(baseDir)) {
     const mountsDir = path.join(baseDir, '.mounts');
@@ -620,7 +624,7 @@ export function reset(debug: boolean = false, baseDir: string = BASE_DIR): void 
     resetBaseDirMappings(baseDir, debug);
   }
   console.log('Reset complete.');
-}
+};
 
 const program = new Command();
 
