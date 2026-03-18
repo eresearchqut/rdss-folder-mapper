@@ -89,13 +89,12 @@ Once installed/downloaded, you can use the `rdss-folder-mapper` command to manag
 ```bash
 rdss-folder-mapper --help
 
-Usage: rdss-folder-mapper [options]
+Usage: rdss-folder-mapper [options] [command]
 
 A cross-platform command-line interface (CLI) tool that allows you to create
 local folder mappings to shared network drives effortlessly.
 
 Options:
-  --reset                    Remove all currently mapped folders
   --debug                    Enable debug logging
   -b, --base-dir <path>      Custom base folder location (default: ~/RDSS)
   -u --username <username>   Username for remote mapping
@@ -106,11 +105,16 @@ Options:
   -t, --truncate <number>    Truncate length for folder names (default: 40)
   -d, --domain <domain>      Domain for remote mapping
   -h, --help                 display help for command
+
+Commands:
+  reset                      Remove all currently mapped folders
+  auth                       Set credentials in the keychain
+  clear-auth                 Clear all credentials from the keychain
 ```
 
 ### Refresh (Default)
 
-Running the CLI without any options executes the `refresh` command. This reads your local `folders.json` file to retrieve your folder mappings and mounts them under a local parent folder named `RDSS`.
+Running the CLI without any commands or options executes the `refresh` command. This reads your local `folders.json` file to retrieve your folder mappings and mounts them under a local parent folder named `RDSS`.
 
 **Note:** The sync process will automatically remove any old drive mappings under the parent `RDSS` folder before creating the new ones.
 
@@ -120,10 +124,25 @@ rdss-folder-mapper
 
 ### Reset
 
-To remove all currently mapped folders, use the `--reset` option.
+To remove all currently mapped folders, use the `reset` command.
 
 ```bash
-rdss-folder-mapper --reset
+rdss-folder-mapper reset
+```
+
+### Authentication
+
+To store your credentials securely in the system keychain (macOS Keychain or Linux secret-tool) so you don't have to provide them every time, use the `auth` command:
+
+```bash
+rdss-folder-mapper auth
+```
+You will be prompted to enter your username, password (which will be hidden), and an optional domain.
+
+To clear these saved credentials:
+
+```bash
+rdss-folder-mapper clear-auth
 ```
 
 
