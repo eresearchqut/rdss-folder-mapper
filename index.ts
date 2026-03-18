@@ -76,10 +76,12 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
       const mountPath = isWindows ? localPath : path.join(MOUNTS_DIR, drive.id);
 
       let isMounted = false;
+      let existingIsFolder = false;
       try {
         if (isWindows) {
           const stat = fs.lstatSync(localPath);
           isMounted = stat.isSymbolicLink();
+          existingIsFolder = !isMounted && stat.isDirectory();
         } else {
           const mountOutput = execSync('mount', { encoding: 'utf8' });
           const lines = mountOutput.split('\n');
@@ -99,7 +101,7 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
         continue;
       }
 
-      if (!fs.existsSync(mountPath)) {
+      if (!isWindows && !fs.existsSync(mountPath)) {
         fs.mkdirSync(mountPath, { recursive: true });
       }
 
@@ -107,6 +109,9 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
 
       try {
         if (isWindows) {
+          if (existingIsFolder) {
+            try { fs.rmdirSync(localPath); } catch {}
+          }
           if (username && password) {
             execSync(`net use "${remote}" "${password}" /user:"${username}"`, { stdio: debug ? 'pipe' : 'ignore' });
           }
@@ -205,7 +210,7 @@ function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
       console.log(`Removing mapping for ${localPath}`);
       try {
         if (isWindows) {
-          execSync(`rmdir "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
+          fs.rmSync(localPath, { recursive: true, force: true });
         } else {
           const stat = fs.lstatSync(localPath);
           if (stat.isSymbolicLink()) {
