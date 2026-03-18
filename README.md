@@ -1,6 +1,6 @@
-# Network Drive Mapper CLI
+# RDSS Folder Mapper CLI
 
-A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to RDSS shared network drives effortlessly. Supported on Windows, macOS, and Linux.
+A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to RDSS shared network folders. Supported on Windows, macOS, and Linux.
 
 ## Features
 
