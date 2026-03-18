@@ -33,6 +33,12 @@ You can install the latest release using PowerShell:
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.ps1 -OutFile install.ps1; .\install.ps1
 ```
 
+Or using Command Prompt (`cmd`):
+
+```cmd
+curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.cmd -o install.cmd && install.cmd
+```
+
 Alternatively, you can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
 
 Available binaries:
