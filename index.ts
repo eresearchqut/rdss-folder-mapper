@@ -370,14 +370,18 @@ function handleMountError(
   }
 }
 
-function mountWindows(
-  remote: string,
-  localPath: string,
-  username?: string,
-  password?: string,
-  domain?: string,
-  debug: boolean = false,
-) {
+interface MountOptions {
+  remote: string;
+  localPath: string;
+  mountPath: string;
+  username?: string;
+  password?: string;
+  domain?: string;
+  debug?: boolean;
+}
+
+function mountWindows(options: MountOptions) {
+  const { remote, localPath, username, password, domain, debug = false } = options;
   const existingIsFolder = isExistingFolder(localPath);
   if (existingIsFolder) {
     try {
@@ -397,15 +401,8 @@ function mountWindows(
   execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
 }
 
-function mountMac(
-  remote: string,
-  localPath: string,
-  mountPath: string,
-  username?: string,
-  password?: string,
-  domain?: string,
-  debug: boolean = false,
-) {
+function mountMac(options: MountOptions) {
+  const { remote, localPath, mountPath, username, password, domain, debug = false } = options;
   let macRemote = remote;
   let macRemoteLog = remote;
   if (username && password && macRemote.startsWith('smb://')) {
@@ -428,15 +425,8 @@ function mountMac(
   }
 }
 
-function mountLinux(
-  remote: string,
-  localPath: string,
-  mountPath: string,
-  username?: string,
-  password?: string,
-  domain?: string,
-  debug: boolean = false,
-) {
+function mountLinux(options: MountOptions) {
+  const { remote, localPath, mountPath, username, password, domain, debug = false } = options;
   let linuxRemote = remote;
   if (linuxRemote.startsWith('smb://')) {
     linuxRemote = linuxRemote.replace('smb://', '//');
@@ -455,17 +445,29 @@ function mountLinux(
   }
 }
 
-function processDriveMapping(
-  drive: DriveMapping,
-  baseDir: string,
-  mountsDir: string,
-  finalRemotePath: string | undefined,
-  truncateLength: number,
-  username?: string,
-  password?: string,
-  domain?: string,
-  debug: boolean = false,
-) {
+interface ProcessDriveMappingOptions {
+  drive: DriveMapping;
+  baseDir: string;
+  mountsDir: string;
+  finalRemotePath: string | undefined;
+  truncateLength: number;
+  username?: string;
+  password?: string;
+  domain?: string;
+  debug?: boolean;
+}
+
+function processDriveMapping({
+  drive,
+  baseDir,
+  mountsDir,
+  finalRemotePath,
+  truncateLength,
+  username,
+  password,
+  domain,
+  debug = false,
+}: ProcessDriveMappingOptions) {
   const remote = finalRemotePath
     ? `${finalRemotePath}${isWindows() ? '\\' : '/'}${drive.id}`
     : isWindows()
@@ -494,11 +496,11 @@ function processDriveMapping(
 
   try {
     if (isWindows()) {
-      mountWindows(remote, localPath, username, password, domain, debug);
+      mountWindows({ remote, localPath, mountPath, username, password, domain, debug });
     } else if (isMac()) {
-      mountMac(remote, localPath, mountPath, username, password, domain, debug);
+      mountMac({ remote, localPath, mountPath, username, password, domain, debug });
     } else {
-      mountLinux(remote, localPath, mountPath, username, password, domain, debug);
+      mountLinux({ remote, localPath, mountPath, username, password, domain, debug });
     }
   } catch (error: unknown) {
     handleMountError(error, remote, localPath, mountPath, password, debug);
@@ -523,7 +525,7 @@ export async function refresh(options: RefreshOptions = {}): Promise<void> {
     const finalRemotePath = cliRemotePath || configData.remotePath;
 
     for (const drive of configData.folders) {
-      processDriveMapping(
+      processDriveMapping({
         drive,
         baseDir,
         mountsDir,
@@ -533,7 +535,7 @@ export async function refresh(options: RefreshOptions = {}): Promise<void> {
         password,
         domain,
         debug,
-      );
+      });
     }
     console.log('Refresh complete.');
   } catch (error: unknown) {
