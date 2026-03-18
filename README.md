@@ -70,6 +70,7 @@ Options:
                              folders.json)
   -r, --remote-path <path>   Custom remote path
   -t, --truncate <number>    Truncate length for folder names (default: 40)
+  -d, --domain <domain>      Domain for remote mapping (default: "qutad")
   -h, --help                 display help for command
 ```
 

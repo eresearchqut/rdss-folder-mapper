@@ -57,7 +57,7 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
   return {};
 }
 
-async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40): Promise<void> {
+async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40, domain: string = 'qutad'): Promise<void> {
   console.log('Refreshing drive mappings...');
   try {
     if (!username || !password) {
@@ -168,7 +168,7 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
           if (linuxRemote.startsWith('smb://')) {
             linuxRemote = linuxRemote.replace('smb://', '//');
           }
-          const mountOpts = (username && password) ? `username=${username},password=${password}` : `guest`;
+          const mountOpts = (username && password) ? `username=${username},password=${password},domain=${domain}` : `guest`;
           execSync(`sudo mount -t cifs -o ${mountOpts} "${linuxRemote}" "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
           if (!fs.existsSync(localPath)) {
             fs.symlinkSync(mountPath, localPath);
@@ -298,11 +298,12 @@ program
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('-r, --remote-path <path>', 'Custom remote path')
   .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10), 40)
+  .option('-d, --domain <domain>', 'Domain for remote mapping', 'qutad')
   .action((options) => {
     if (options.reset) {
       reset(options.debug, options.baseDir);
     } else {
-      refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath, options.truncate).then();
+      refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath, options.truncate, options.domain).then();
     }
   });
 
