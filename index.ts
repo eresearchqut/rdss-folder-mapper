@@ -24,7 +24,7 @@ interface DriveMapping {
   nickname?: string;
 }
 
-function getCredentialsFromKeychain(debug: boolean): { username?: string; password?: string } {
+function getCredentialsFromKeychain(debug: boolean): { username?: string; password?: string; domain?: string } {
   if (isMac) {
     try {
       if (debug) console.log('Attempting to read credentials from macOS keychain...');
@@ -32,10 +32,18 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
       const stdout = execSync('security find-generic-password -s "rdss-folder-mapper"', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
       const stderr = execSync('security find-generic-password -s "rdss-folder-mapper" -w', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
       const accountMatch = stdout.match(/"acct"<blob>="([^"]+)"/);
+      const domainMatch = stdout.match(/"gena"<blob>="([^"]+)"/) || stdout.match(/"icmt"<blob>="([^"]+)"/);
       const password = stderr.trim();
       if (accountMatch && password) {
         if (debug) console.log('Credentials successfully retrieved from macOS keychain.');
-        return { username: accountMatch[1], password };
+        let username = accountMatch[1];
+        let domain = domainMatch ? domainMatch[1] : undefined;
+        if (!domain && username.includes('\\')) {
+          const parts = username.split('\\');
+          domain = parts[0];
+          username = parts[1];
+        }
+        return { username, password, domain };
       }
     } catch (e) {
       if (debug) console.log('Failed to read from macOS keychain:', (e as Error).message);
@@ -45,10 +53,18 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
       if (debug) console.log('Attempting to read credentials from Linux secret-tool...');
       const searchOutput = execSync('secret-tool search --all service rdss-folder-mapper', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
       const accountMatch = searchOutput.match(/username = (.+)/);
+      const domainMatch = searchOutput.match(/domain = (.+)/);
       const password = execSync('secret-tool lookup service rdss-folder-mapper', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
       if (accountMatch && password) {
         if (debug) console.log('Credentials successfully retrieved from Linux secret-tool.');
-        return { username: accountMatch[1].trim(), password };
+        let username = accountMatch[1].trim();
+        let domain = domainMatch ? domainMatch[1].trim() : undefined;
+        if (!domain && username.includes('\\')) {
+          const parts = username.split('\\');
+          domain = parts[0];
+          username = parts[1];
+        }
+        return { username, password, domain };
       }
     } catch (e) {
       if (debug) console.log('Failed to read from Linux secret-tool:', (e as Error).message);
@@ -57,14 +73,17 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
   return {};
 }
 
-async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40, domain: string = 'qutad'): Promise<void> {
+async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40, domain?: string): Promise<void> {
   console.log('Refreshing drive mappings...');
   try {
-    if (!username || !password) {
+    if (!username || !password || !domain) {
       const keychainCreds = getCredentialsFromKeychain(debug);
       username = username || keychainCreds.username;
       password = password || keychainCreds.password;
+      domain = domain || keychainCreds.domain;
     }
+    
+    domain = domain || 'qutad';
 
     if (!username && password) {
       username = os.userInfo().username;
@@ -318,7 +337,7 @@ program
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('-r, --remote-path <path>', 'Custom remote path')
   .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10), 40)
-  .option('-d, --domain <domain>', 'Domain for remote mapping', 'qutad')
+  .option('-d, --domain <domain>', 'Domain for remote mapping')
   .action((options) => {
     if (options.reset) {
       reset(options.debug, options.baseDir);
