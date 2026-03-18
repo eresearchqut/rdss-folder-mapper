@@ -33,11 +33,10 @@ You can install the latest release using PowerShell:
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.ps1 -OutFile install.ps1; .\install.ps1
 ```
 
-Or using Command Prompt (`cmd`):
+Or download the latest version to your home directory using Command Prompt (`cmd`):
 
 ```cmd
-curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.cmd -o "%USERPROFILE%\install.cmd"
-"%USERPROFILE%\install.cmd"
+curl -fsSL https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe -o "%USERPROFILE%\rdss-folder-mapper.exe"
 ```
 
 Alternatively, you can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
