@@ -15,22 +15,22 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 - **macOS**: macOS 10.15+ (requires SMB client, usually built-in)
 - **Linux**: Requires `cifs-utils` or `smbclient` installed on the system.
 
-## Installation
+## Download
 
 ### macOS & Linux
 
-You can install the latest release directly using the installation script:
+You can download the latest release directly using the download script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/download.sh | sh
 ```
 
 ### Windows
 
-You can install the latest release using PowerShell:
+You can download the latest release using PowerShell:
 
 ```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/install.ps1 -OutFile install.ps1; .\install.ps1
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/download.ps1 -OutFile download.ps1; .\download.ps1
 ```
 
 Or download the latest version to your home directory using Command Prompt (`cmd`):
@@ -45,6 +45,40 @@ Available binaries:
 - [🪟 Windows (`rdss-folder-mapper-win.exe`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe)
 - [🍎 macOS (`rdss-folder-mapper-macos`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos)
 - [🐧 Linux (`rdss-folder-mapper-linux`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux)
+
+## Configuration
+
+The CLI reads from a local `folders.json` file (in the same directory you run the command from) that returns a JSON mapping containing a listing of all your available folders. Each drive entry includes:
+
+- **id**: The short code and actual name of the folder. The remote location is derived from the Unix or Windows base path plus the id.
+- **title**: The human-readable version of the folder name.
+- **nickname**: An optional folder nickname.
+
+Example `folders.json`:
+
+```json
+{
+  "folders": [  
+    {
+      "id": "PRJ123",
+      "title": "Project Alpha Data",
+      "nickname": "Alpha"
+    },
+    {
+      "id": "PRJ456",
+      "title": "Project Beta Data"
+    }
+  ]
+}
+```
+
+This configuration will result in the following folder structure:
+
+```text
+~/RDSS/
+├── Alpha [PRJ123]/
+└── Project Beta Data [PRJ456]/
+```
 
 ## Usage
 
@@ -92,37 +126,5 @@ To remove all currently mapped folders, use the `--reset` option.
 rdss-folder-mapper --reset
 ```
 
-## Configuration
 
-The CLI reads from a local `folders.json` file (in the same directory you run the command from) that returns a JSON mapping containing a listing of all your available folders. Each drive entry includes:
-
-- **id**: The short code and actual name of the folder. The remote location is derived from the Unix or Windows base path plus the id.
-- **title**: The human-readable version of the folder name.
-- **nickname**: An optional folder nickname.
-
-Example `folders.json`:
-
-```json
-{
-  "folders": [  
-    {
-      "id": "PRJ123",
-      "title": "Project Alpha Data",
-      "nickname": "Alpha"
-    },
-    {
-      "id": "PRJ456",
-      "title": "Project Beta Data"
-    }
-  ]
-}
-```
-
-This configuration will result in the following folder structure:
-
-```text
-~/RDSS/
-├── Alpha [PRJ123]/
-└── Project Beta Data [PRJ456]/
-```
 
