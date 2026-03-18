@@ -1,6 +1,6 @@
 {
   "name": "rdss-folder-mapper",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network drives effortlessly. Supported on Windows, macOS, and Linux.",
   "main": "dist/index.js",
   "bin": "dist/index.js",
