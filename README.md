@@ -63,6 +63,7 @@ Options:
   -f, --folders <path>       Custom folders JSON file location (default:
                              folders.json)
   -r, --remote-path <path>   Custom remote path
+  -t, --truncate <number>    Truncate length for folder names (default: 40)
   -h, --help                 display help for command
 ```
 
@@ -84,7 +85,7 @@ To remove all currently mapped folders, use the `--reset` option.
 rdss-folder-mapper --reset
 ```
 
-## Configuration Data
+## Configuration
 
 The CLI reads from a local `folders.json` file (in the same directory you run the command from) that returns a JSON mapping containing a listing of all your available folders. Each drive entry includes:
 
@@ -108,5 +109,13 @@ Example `folders.json`:
     }
   ]
 }
+```
+
+This configuration will result in the following folder structure:
+
+```text
+~/RDSS/
+├── Alpha [PRJ123]/
+└── Project Beta Data [PRJ456]/
 ```
 
