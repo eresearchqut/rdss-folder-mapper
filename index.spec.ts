@@ -1,4 +1,4 @@
-import { GenericContainer, Wait } from 'testcontainers';
+import { GenericContainer, Wait, StartedTestContainer } from 'testcontainers';
 import net from 'net';
 import fs from 'fs';
 import path from 'path';
@@ -6,10 +6,9 @@ import { execSync } from 'child_process';
 import os from 'os';
 
 const isWindows = os.platform() === 'win32';
-const isMac = os.platform() === 'darwin';
 
 describe('Integration Test', () => {
-  let container: any;
+  let container: StartedTestContainer;
   const testFilesDir = path.join(process.cwd(), '.smb', 'config');
 
   beforeAll(async () => {
@@ -80,7 +79,7 @@ describe('Integration Test', () => {
         'folders.json',
         JSON.stringify({
           folders: [{ id: 'test_share', nickname: 'TestShare' }],
-        })
+        }),
       );
     });
 
@@ -90,7 +89,7 @@ describe('Integration Test', () => {
       }
       try {
         execSync(`npx ts-node index.ts reset --base-dir ${testRdssDir}`, { stdio: 'ignore' });
-      } catch (e) {
+      } catch {
         // ignore
       }
     });
@@ -98,7 +97,7 @@ describe('Integration Test', () => {
     test('should recreate RDSS folder and run CLI', async () => {
       const host = container.getHost();
       const port = container.getMappedPort(445);
-      
+
       const basePathWin = `\\\\${host}`;
       // Usually dockurr/samba maps volumes, but we can just use smb://${host}:${port}
       const basePathNix = `smb://${host}:${port}`;
@@ -116,7 +115,7 @@ describe('Integration Test', () => {
       // Verify that the CLI started to create the mapping
       // Since mounting might fail in CI/local depending on perms, we mainly check if the .test/RDSS directory has the expected structures
       const mountsDir = path.join(testRdssDir, '.mounts');
-      
+
       if (!isWindows) {
         expect(fs.existsSync(mountsDir)).toBe(true);
       } else {
@@ -127,7 +126,7 @@ describe('Integration Test', () => {
     test('should fail to mount and warn when using invalid credentials', async () => {
       const host = container.getHost();
       const port = container.getMappedPort(445);
-      
+
       const basePathWin = `\\\\${host}`;
       const basePathNix = `smb://${host}:${port}`;
 
@@ -140,20 +139,31 @@ describe('Integration Test', () => {
       };
 
       try {
-        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} 2>&1`, { env, stdio: 'pipe' });
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} 2>&1`, {
+          env,
+          stdio: 'pipe',
+        });
         expect(output.toString()).toContain('Error: Failed to map');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
-        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain('Error: Failed to map');
+        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain(
+          'Error: Failed to map',
+        );
       }
     });
 
     test('should fail when folders.json is missing', async () => {
       fs.rmSync('folders.json');
       try {
-        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} 2>&1`, { stdio: 'pipe' });
+        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} 2>&1`, {
+          stdio: 'pipe',
+        });
         expect(output.toString()).toContain('Failed to read or parse folders.json');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
-        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain('Failed to read or parse folders.json');
+        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain(
+          'Failed to read or parse folders.json',
+        );
       }
     });
 
@@ -163,12 +173,12 @@ describe('Integration Test', () => {
         customFoldersFile,
         JSON.stringify({
           folders: [{ id: 'test_share', nickname: 'CustomShare' }],
-        })
+        }),
       );
 
       const host = container.getHost();
       const port = container.getMappedPort(445);
-      
+
       const basePathWin = `\\\\${host}`;
       const basePathNix = `smb://${host}:${port}`;
 
@@ -180,7 +190,10 @@ describe('Integration Test', () => {
         RDSS_PASSWORD: 'testpass',
       };
 
-      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile}`, { env, stdio: 'pipe' });
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile}`, {
+        env,
+        stdio: 'pipe',
+      });
 
       const mountsDir = path.join(testRdssDir, '.mounts');
       if (!isWindows) {
@@ -193,25 +206,38 @@ describe('Integration Test', () => {
     test('should fail when custom folders file is missing', async () => {
       const missingFoldersFile = path.join(testRdssDir, 'missing-folders.json');
       try {
-        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} -f ${missingFoldersFile} 2>&1`, { stdio: 'pipe' });
+        const output = execSync(
+          `npx ts-node index.ts --base-dir ${testRdssDir} -f ${missingFoldersFile} 2>&1`,
+          { stdio: 'pipe' },
+        );
         expect(output.toString()).toContain(`Failed to read or parse ${missingFoldersFile}`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
-        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain(`Failed to read or parse ${missingFoldersFile}`);
+        expect(e.stderr?.toString() || e.stdout?.toString() || e.message).toContain(
+          `Failed to read or parse ${missingFoldersFile}`,
+        );
       }
     });
 
     test('should use custom remote path when --remote-path is provided', async () => {
       // Use an invalid host so it fails to mount reliably, allowing us to inspect the error string
-      const customRemotePath = isWindows ? `\\\\invalid-test-host` : `smb://invalid-test-host:445`;
+      const customRemotePath = isWindows ? '\\\\invalid-test-host' : 'smb://invalid-test-host:445';
       const env = { ...process.env, RDSS_USERNAME: 'testuser', RDSS_PASSWORD: 'testpass' };
 
       try {
-        const output = execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --remote-path ${customRemotePath} 2>&1`, { env, stdio: 'pipe' });
+        const output = execSync(
+          `npx ts-node index.ts --base-dir ${testRdssDir} --remote-path ${customRemotePath} 2>&1`,
+          { env, stdio: 'pipe' },
+        );
+        expect(output.toString()).toBeDefined();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (e: any) {
         // Since we are mocking the mount and it might fail, we just make sure the error output
         // mentions mapping the custom path rather than the default env ones
         const outputStr = e.stderr?.toString() || e.stdout?.toString() || e.message;
-        const expectedRemote = isWindows ? `${customRemotePath}\\test_share` : `${customRemotePath}/test_share`;
+        const expectedRemote = isWindows
+          ? `${customRemotePath}\\test_share`
+          : `${customRemotePath}/test_share`;
         expect(outputStr).toContain(`Error: Failed to map ${expectedRemote}`);
       }
     });
@@ -222,7 +248,7 @@ describe('Integration Test', () => {
 
       const fakeTarget = path.join(mountsDir, 'fake');
       fs.mkdirSync(fakeTarget, { recursive: true });
-      
+
       const fakeLocalPath = path.join(testRdssDir, 'FakeShare');
       if (isWindows) {
         fs.mkdirSync(fakeLocalPath, { recursive: true });
@@ -232,7 +258,7 @@ describe('Integration Test', () => {
 
       try {
         execSync(`npx ts-node index.ts reset --base-dir ${testRdssDir}`, { stdio: 'pipe' });
-      } catch (e) {
+      } catch {
         // ignore reset failure
       }
       expect(fs.existsSync(fakeLocalPath)).toBe(false);
@@ -243,13 +269,19 @@ describe('Integration Test', () => {
       fs.writeFileSync(
         customFoldersFile,
         JSON.stringify({
-          folders: [{ id: 'test_share', title: 'This is a very long <title> that should definitely be truncated because it exceeds sixty characters' }],
-        })
+          folders: [
+            {
+              id: 'test_share',
+              title:
+                'This is a very long <title> that should definitely be truncated because it exceeds sixty characters',
+            },
+          ],
+        }),
       );
 
       const host = container.getHost();
       const port = container.getMappedPort(445);
-      
+
       const basePathWin = `\\\\${host}`;
       const basePathNix = `smb://${host}:${port}`;
 
@@ -261,27 +293,51 @@ describe('Integration Test', () => {
         RDSS_PASSWORD: 'testpass',
       };
 
-      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile}`, { env, stdio: 'pipe' });
+      execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --folders ${customFoldersFile}`, {
+        env,
+        stdio: 'pipe',
+      });
 
       const expectedFolderName = 'This Is A Very Long Title That Should... [test_share]';
       const localPath = path.join(testRdssDir, expectedFolderName);
-      
+
       expect(fs.existsSync(localPath)).toBe(true);
     });
 
     test('should assert access to multiple user home directories via smbclient', async () => {
       // Assert Alice has access to her home
-      const aliceExec = await container.exec(['smbclient', '//127.0.0.1/alice', '-U', 'alice%alicepass', '-c', 'get alice_test.txt -']);
+      const aliceExec = await container.exec([
+        'smbclient',
+        '//127.0.0.1/alice',
+        '-U',
+        'alice%alicepass',
+        '-c',
+        'get alice_test.txt -',
+      ]);
       expect(aliceExec.exitCode).toBe(0);
       expect(aliceExec.output).toContain('alice_data');
 
       // Assert Bob has access to his home
-      const bobExec = await container.exec(['smbclient', '//127.0.0.1/bob', '-U', 'bob%bobpass', '-c', 'get bob_test.txt -']);
+      const bobExec = await container.exec([
+        'smbclient',
+        '//127.0.0.1/bob',
+        '-U',
+        'bob%bobpass',
+        '-c',
+        'get bob_test.txt -',
+      ]);
       expect(bobExec.exitCode).toBe(0);
       expect(bobExec.output).toContain('bob_data');
 
       // Assert Alice cannot access Bob's home
-      const aliceDenyExec = await container.exec(['smbclient', '//127.0.0.1/bob', '-U', 'alice%alicepass', '-c', 'ls']);
+      const aliceDenyExec = await container.exec([
+        'smbclient',
+        '//127.0.0.1/bob',
+        '-U',
+        'alice%alicepass',
+        '-c',
+        'ls',
+      ]);
       expect(aliceDenyExec.exitCode).not.toBe(0);
     });
   });

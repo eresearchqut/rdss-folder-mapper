@@ -14,6 +14,7 @@ const isMac = os.platform() === 'darwin';
 const REMOTE_PATH_WIN = process.env.REMOTE_PATH_WIN || '\\\\rstore.qut.edu.au\\Projects';
 const REMOTE_PATH_NIX = process.env.REMOTE_PATH_NIX || 'smb://rstore.qut.edu.au/projects';
 
+// eslint-disable-next-line no-control-regex
 const INVALID_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
 
 // The local parent directory for mappings
@@ -25,15 +26,26 @@ interface DriveMapping {
   nickname?: string;
 }
 
-function getCredentialsFromKeychain(debug: boolean): { username?: string; password?: string; domain?: string } {
+function getCredentialsFromKeychain(debug: boolean): {
+  username?: string;
+  password?: string;
+  domain?: string;
+} {
   if (isMac) {
     try {
       if (debug) console.log('Attempting to read credentials from macOS keychain...');
       // Note: `security` writes the password to stderr, and attributes to stdout. We catch both by not redirecting stderr to ignore.
-      const stdout = execSync('security find-generic-password -s "rdss-folder-mapper"', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-      const stderr = execSync('security find-generic-password -s "rdss-folder-mapper" -w', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const stdout = execSync('security find-generic-password -s "rdss-folder-mapper"', {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const stderr = execSync('security find-generic-password -s "rdss-folder-mapper" -w', {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
       const accountMatch = stdout.match(/"acct"<blob>="([^"]+)"/);
-      const domainMatch = stdout.match(/"gena"<blob>="([^"]+)"/) || stdout.match(/"icmt"<blob>="([^"]+)"/);
+      const domainMatch =
+        stdout.match(/"gena"<blob>="([^"]+)"/) || stdout.match(/"icmt"<blob>="([^"]+)"/);
       const password = stderr.trim();
       if (accountMatch && password) {
         if (debug) console.log('Credentials successfully retrieved from macOS keychain.');
@@ -52,10 +64,16 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
   } else if (!isWindows) {
     try {
       if (debug) console.log('Attempting to read credentials from Linux secret-tool...');
-      const searchOutput = execSync('secret-tool search --all service rdss-folder-mapper', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const searchOutput = execSync('secret-tool search --all service rdss-folder-mapper', {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
       const accountMatch = searchOutput.match(/username = (.+)/);
       const domainMatch = searchOutput.match(/domain = (.+)/);
-      const password = execSync('secret-tool lookup service rdss-folder-mapper', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      const password = execSync('secret-tool lookup service rdss-folder-mapper', {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
       if (accountMatch && password) {
         if (debug) console.log('Credentials successfully retrieved from Linux secret-tool.');
         let username = accountMatch[1].trim();
@@ -74,15 +92,14 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
   return {};
 }
 
-function saveCredentialsToKeychain(creds: { username?: string; password?: string; domain?: string }, debug: boolean): void {
+function saveCredentialsToKeychain(
+  creds: { username?: string; password?: string; domain?: string },
+  debug: boolean,
+): void {
   if (isMac) {
     try {
       if (debug) console.log('Saving credentials to macOS keychain...');
-      const args = [
-        'add-generic-password',
-        '-s', 'rdss-folder-mapper',
-        '-U'
-      ];
+      const args = ['add-generic-password', '-s', 'rdss-folder-mapper', '-U'];
       if (creds.username) {
         args.push('-a', creds.username);
       }
@@ -104,18 +121,17 @@ function saveCredentialsToKeychain(creds: { username?: string; password?: string
   } else if (!isWindows) {
     try {
       if (debug) console.log('Saving credentials to Linux secret-tool...');
-      const args = [
-        'store',
-        '--label=RDSS Folder Mapper',
-        'service', 'rdss-folder-mapper'
-      ];
+      const args = ['store', '--label=RDSS Folder Mapper', 'service', 'rdss-folder-mapper'];
       if (creds.username) {
         args.push('username', creds.username);
       }
       if (creds.domain) {
         args.push('domain', creds.domain);
       }
-      execFileSync('secret-tool', args, { input: creds.password, stdio: ['pipe', debug ? 'pipe' : 'ignore', debug ? 'pipe' : 'ignore'] });
+      execFileSync('secret-tool', args, {
+        input: creds.password,
+        stdio: ['pipe', debug ? 'pipe' : 'ignore', debug ? 'pipe' : 'ignore'],
+      });
     } catch (e) {
       if (debug) console.log('Failed to save to Linux secret-tool:', (e as Error).message);
     }
@@ -128,14 +144,18 @@ function clearCredentialsFromKeychain(debug: boolean): void {
   if (isMac) {
     try {
       if (debug) console.log('Clearing credentials from macOS keychain...');
-      execSync('security delete-generic-password -s "rdss-folder-mapper"', { stdio: debug ? 'pipe' : 'ignore' });
+      execSync('security delete-generic-password -s "rdss-folder-mapper"', {
+        stdio: debug ? 'pipe' : 'ignore',
+      });
     } catch (e) {
       if (debug) console.log('Failed to clear macOS keychain:', (e as Error).message);
     }
   } else if (!isWindows) {
     try {
       if (debug) console.log('Clearing credentials from Linux secret-tool...');
-      execSync('secret-tool clear service rdss-folder-mapper', { stdio: debug ? 'pipe' : 'ignore' });
+      execSync('secret-tool clear service rdss-folder-mapper', {
+        stdio: debug ? 'pipe' : 'ignore',
+      });
     } catch (e) {
       if (debug) console.log('Failed to clear Linux secret-tool:', (e as Error).message);
     }
@@ -156,7 +176,14 @@ interface RefreshOptions {
 }
 
 async function refresh(options: RefreshOptions = {}): Promise<void> {
-  let { debug = false, baseDir = BASE_DIR, username, password, foldersFile = 'folders.json', cliRemotePath, truncateLength = 40, domain } = options;
+  const {
+    debug = false,
+    baseDir = BASE_DIR,
+    foldersFile = 'folders.json',
+    cliRemotePath,
+    truncateLength = 40,
+  } = options;
+  let { username, password, domain } = options;
   console.log('Refreshing drive mappings...');
   try {
     if (!username || !password || !domain) {
@@ -165,7 +192,7 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
       password = password || keychainCreds.password;
       domain = domain || keychainCreds.domain;
     }
-    
+
     domain = domain || 'qutad';
 
     if (!username && password) {
@@ -180,7 +207,9 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
       folders = parsedData.folders || [];
       configRemotePath = parsedData.remotePath;
     } catch {
-      throw new Error(`Failed to read or parse ${foldersFile}. Please ensure the file exists and is valid JSON.`);
+      throw new Error(
+        `Failed to read or parse ${foldersFile}. Please ensure the file exists and is valid JSON.`,
+      );
     }
 
     const MOUNTS_DIR = path.join(baseDir, '.mounts');
@@ -188,7 +217,7 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
     if (!fs.existsSync(baseDir)) {
       fs.mkdirSync(baseDir, { recursive: true });
     } else {
-      const existingItems = fs.readdirSync(baseDir).filter(item => item !== '.mounts');
+      const existingItems = fs.readdirSync(baseDir).filter((item) => item !== '.mounts');
       if (existingItems.length > 0) {
         reset(debug, baseDir);
       }
@@ -204,8 +233,8 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
       const remote = finalRemotePath
         ? `${finalRemotePath}${isWindows ? '\\' : '/'}${drive.id}`
         : isWindows
-        ? `${REMOTE_PATH_WIN}\\${drive.id}`
-        : `${REMOTE_PATH_NIX}/${drive.id}`;
+          ? `${REMOTE_PATH_WIN}\\${drive.id}`
+          : `${REMOTE_PATH_NIX}/${drive.id}`;
 
       let folderName = drive.nickname ? drive.nickname.replace(INVALID_CHARS_REGEX, '') : undefined;
       if (!folderName) {
@@ -230,7 +259,9 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
         } else {
           const mountOutput = execSync('mount', { encoding: 'utf8' });
           const lines = mountOutput.split('\n');
-          isMounted = lines.some(line => line.includes(` on ${mountPath} `) || line.includes(` on ${mountPath} (`));
+          isMounted = lines.some(
+            (line) => line.includes(` on ${mountPath} `) || line.includes(` on ${mountPath} (`),
+          );
         }
       } catch {
         // Does not exist
@@ -255,12 +286,17 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
       try {
         if (isWindows) {
           if (existingIsFolder) {
-            try { fs.rmdirSync(localPath); } catch {}
+            try {
+              fs.rmdirSync(localPath);
+            } catch {
+              /* empty */
+            }
           }
           if (username && password) {
             const userWithDomain = domain ? `${domain}\\${username}` : username;
             const cmd = `net use "${remote}" "${password}" /user:"${userWithDomain}"`;
-            if (debug) console.log(`Executing: net use "${remote}" "***" /user:"${userWithDomain}"`);
+            if (debug)
+              console.log(`Executing: net use "${remote}" "***" /user:"${userWithDomain}"`);
             execSync(cmd, { stdio: debug ? 'pipe' : 'ignore' });
           }
           const mklinkCmd = `mklink /D "${localPath}" "${remote}"`;
@@ -271,11 +307,19 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
           let macRemoteLog = remote;
           if (username && password && macRemote.startsWith('smb://')) {
             const domainPrefix = domain ? `${encodeURIComponent(domain)};` : '';
-            macRemote = macRemote.replace('smb://', `smb://${domainPrefix}${encodeURIComponent(username)}:${encodeURIComponent(password)}@`);
-            macRemoteLog = macRemoteLog.replace('smb://', `smb://${domainPrefix}${encodeURIComponent(username)}:***@`);
+            macRemote = macRemote.replace(
+              'smb://',
+              `smb://${domainPrefix}${encodeURIComponent(username)}:${encodeURIComponent(password)}@`,
+            );
+            macRemoteLog = macRemoteLog.replace(
+              'smb://',
+              `smb://${domainPrefix}${encodeURIComponent(username)}:***@`,
+            );
           }
           if (debug) console.log(`Executing: mount_smbfs "${macRemoteLog}" "${mountPath}"`);
-          execSync(`mount_smbfs "${macRemote}" "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
+          execSync(`mount_smbfs "${macRemote}" "${mountPath}"`, {
+            stdio: debug ? 'pipe' : 'ignore',
+          });
           if (!fs.existsSync(localPath)) {
             fs.symlinkSync(mountPath, localPath);
           }
@@ -284,10 +328,19 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
           if (linuxRemote.startsWith('smb://')) {
             linuxRemote = linuxRemote.replace('smb://', '//');
           }
-          const mountOpts = (username && password) ? `username=${username},password=${password},domain=${domain}` : `guest`;
-          const mountOptsLog = (username && password) ? `username=${username},password=***,domain=${domain}` : `guest`;
-          if (debug) console.log(`Executing: sudo mount -t cifs -o ${mountOptsLog} "${linuxRemote}" "${mountPath}"`);
-          execSync(`sudo mount -t cifs -o ${mountOpts} "${linuxRemote}" "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
+          const mountOpts =
+            username && password
+              ? `username=${username},password=${password},domain=${domain}`
+              : 'guest';
+          const mountOptsLog =
+            username && password ? `username=${username},password=***,domain=${domain}` : 'guest';
+          if (debug)
+            console.log(
+              `Executing: sudo mount -t cifs -o ${mountOptsLog} "${linuxRemote}" "${mountPath}"`,
+            );
+          execSync(`sudo mount -t cifs -o ${mountOpts} "${linuxRemote}" "${mountPath}"`, {
+            stdio: debug ? 'pipe' : 'ignore',
+          });
           if (!fs.existsSync(localPath)) {
             fs.symlinkSync(mountPath, localPath);
           }
@@ -301,7 +354,12 @@ async function refresh(options: RefreshOptions = {}): Promise<void> {
         }
         console.error(`Error: Failed to map ${remote} to ${localPath}`);
         console.error(`Reason: ${msg}`);
-        if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'stderr' in error &&
+          (error as { stderr?: unknown }).stderr
+        ) {
           let stderrMsg = String((error as { stderr: unknown }).stderr);
           if (password) {
             stderrMsg = stderrMsg.split(password).join('***');
@@ -361,7 +419,12 @@ function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
           const msg = error instanceof Error ? error.message : String(error);
           console.error(`Error: Failed to unmount ${mountPath}`);
           console.error(`Reason: ${msg}`);
-          if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
+          if (
+            error &&
+            typeof error === 'object' &&
+            'stderr' in error &&
+            (error as { stderr?: unknown }).stderr
+          ) {
             console.error(`Command Output: ${String((error as { stderr: unknown }).stderr)}`);
           }
           if (debug) {
@@ -402,7 +465,12 @@ function reset(debug: boolean = false, baseDir: string = BASE_DIR): void {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`Error: Failed to remove mapping at ${localPath}`);
         console.error(`Reason: ${msg}`);
-        if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
+        if (
+          error &&
+          typeof error === 'object' &&
+          'stderr' in error &&
+          (error as { stderr?: unknown }).stderr
+        ) {
           console.error(`Command Output: ${String((error as { stderr: unknown }).stderr)}`);
         }
         if (debug) {
@@ -425,7 +493,12 @@ program
   .option('-b, --base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('-r, --remote-path <path>', 'Custom remote path')
-  .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10), 40)
+  .option(
+    '-t, --truncate <number>',
+    'Truncate length for folder names',
+    (val) => parseInt(val, 10),
+    40,
+  )
   .option('-d, --domain <domain>', 'Domain for remote mapping')
   .action((options) => {
     refresh({
@@ -436,8 +509,8 @@ program
       foldersFile: options.folders,
       cliRemotePath: options.remotePath,
       truncateLength: options.truncate,
-      domain: options.domain
-    }).then();
+      domain: options.domain,
+    }).catch(console.error);
   });
 
 program
@@ -459,15 +532,17 @@ program
 
     const debug = program.opts().debug || false;
 
-    let usernameInput = readlineSync.question('Enter username (leave blank to use current user): ');
-    let username = usernameInput.trim() || os.userInfo().username;
+    const usernameInput = readlineSync.question(
+      'Enter username (leave blank to use current user): ',
+    );
+    const username = usernameInput.trim() || os.userInfo().username;
 
     const password = readlineSync.question('Enter password: ', {
-      hideEchoBack: true
+      hideEchoBack: true,
     });
 
-    let domainInput = readlineSync.question('Enter domain (optional): ');
-    let domain = domainInput.trim() || undefined;
+    const domainInput = readlineSync.question('Enter domain (optional): ');
+    const domain = domainInput.trim() || undefined;
 
     saveCredentialsToKeychain({ username, password, domain }, debug);
     console.log('Successfully updated credentials in keychain.');
