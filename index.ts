@@ -24,9 +24,47 @@ interface DriveMapping {
   nickname?: string;
 }
 
+function getCredentialsFromKeychain(debug: boolean): { username?: string; password?: string } {
+  if (isMac) {
+    try {
+      if (debug) console.log('Attempting to read credentials from macOS keychain...');
+      // Note: `security` writes the password to stderr, and attributes to stdout. We catch both by not redirecting stderr to ignore.
+      const stdout = execSync('security find-generic-password -s "rdss-folder-mapper"', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const stderr = execSync('security find-generic-password -s "rdss-folder-mapper" -w', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const accountMatch = stdout.match(/"acct"<blob>="([^"]+)"/);
+      const password = stderr.trim();
+      if (accountMatch && password) {
+        if (debug) console.log('Credentials successfully retrieved from macOS keychain.');
+        return { username: accountMatch[1], password };
+      }
+    } catch (e) {
+      if (debug) console.log('Failed to read from macOS keychain:', (e as Error).message);
+    }
+  } else if (!isWindows) {
+    try {
+      if (debug) console.log('Attempting to read credentials from Linux secret-tool...');
+      const searchOutput = execSync('secret-tool search --all service rdss-folder-mapper', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      const accountMatch = searchOutput.match(/username = (.+)/);
+      const password = execSync('secret-tool lookup service rdss-folder-mapper', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      if (accountMatch && password) {
+        if (debug) console.log('Credentials successfully retrieved from Linux secret-tool.');
+        return { username: accountMatch[1].trim(), password };
+      }
+    } catch (e) {
+      if (debug) console.log('Failed to read from Linux secret-tool:', (e as Error).message);
+    }
+  }
+  return {};
+}
+
 async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40): Promise<void> {
   console.log('Refreshing drive mappings...');
   try {
+    if (!username || !password) {
+      const keychainCreds = getCredentialsFromKeychain(debug);
+      username = username || keychainCreds.username;
+      password = password || keychainCreds.password;
+    }
     let folders: DriveMapping[] = [];
     let configRemotePath: string | undefined;
     try {
