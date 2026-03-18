@@ -6,6 +6,7 @@ import { execSync } from 'child_process';
 import { Command } from 'commander';
 import { startCase } from 'lodash';
 import truncate from '@stdlib/string-truncate';
+import { password as promptPassword, input as promptInput } from '@inquirer/prompts';
 
 const isWindows = os.platform() === 'win32';
 const isMac = os.platform() === 'darwin';
@@ -57,14 +58,27 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
   return {};
 }
 
+function saveCredentialsToKeychain(username: string, pass: string, debug: boolean): void {
+  if (isMac) {
+    try {
+      if (debug) console.log('Saving credentials to macOS keychain...');
+      execSync(`security add-generic-password -s "rdss-folder-mapper" -a "${username}" -w "${pass}" -U`, { stdio: debug ? 'pipe' : 'ignore' });
+    } catch (e) {
+      if (debug) console.log('Failed to save to macOS keychain:', (e as Error).message);
+    }
+  } else if (!isWindows) {
+    try {
+      if (debug) console.log('Saving credentials to Linux secret-tool...');
+      execSync(`printf "%s" "${pass}" | secret-tool store --label="RDSS Folder Mapper" service rdss-folder-mapper username "${username}"`, { stdio: debug ? 'pipe' : 'ignore' });
+    } catch (e) {
+      if (debug) console.log('Failed to save to Linux secret-tool:', (e as Error).message);
+    }
+  }
+}
+
 async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, username?: string, password?: string, foldersFile: string = 'folders.json', cliRemotePath?: string, truncateLength: number = 40, domain: string = 'qutad'): Promise<void> {
   console.log('Refreshing drive mappings...');
   try {
-    if (!username || !password) {
-      const keychainCreds = getCredentialsFromKeychain(debug);
-      username = username || keychainCreds.username;
-      password = password || keychainCreds.password;
-    }
     let folders: DriveMapping[] = [];
     let configRemotePath: string | undefined;
     try {
@@ -74,6 +88,21 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
       configRemotePath = parsedData.remotePath;
     } catch {
       throw new Error(`Failed to read or parse ${foldersFile}. Please ensure the file exists and is valid JSON.`);
+    }
+
+    let promptedForPassword = false;
+    if (!username || !password) {
+      const keychainCreds = getCredentialsFromKeychain(debug);
+      username = username || keychainCreds.username;
+      password = password || keychainCreds.password;
+    }
+
+    if (!username) {
+      username = await promptInput({ message: 'Enter username:' });
+    }
+    if (!password) {
+      password = await promptPassword({ message: 'Enter password:', mask: '*' });
+      promptedForPassword = true;
     }
 
     const MOUNTS_DIR = path.join(baseDir, '.mounts');
@@ -184,6 +213,11 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
           if (!fs.existsSync(localPath)) {
             fs.symlinkSync(mountPath, localPath);
           }
+        }
+        
+        if (promptedForPassword && username && password && (!isWindows)) {
+          saveCredentialsToKeychain(username, password, debug);
+          promptedForPassword = false; // Only save once
         }
       } catch (error: unknown) {
         process.exitCode = 1;

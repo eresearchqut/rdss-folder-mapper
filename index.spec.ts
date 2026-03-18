@@ -6,7 +6,6 @@ import { execSync } from 'child_process';
 import os from 'os';
 
 const isWindows = os.platform() === 'win32';
-const isMac = os.platform() === 'darwin';
 
 describe('Integration Test', () => {
   let container: any;
