@@ -75,26 +75,31 @@ function getCredentialsFromKeychain(debug: boolean): { username?: string; passwo
 }
 
 function saveCredentialsToKeychain(creds: { username?: string; password?: string; domain?: string }, debug: boolean): void {
-  const username = creds.username || '';
-  const pass = creds.password || '';
-  const domain = creds.domain || '';
-
   if (isMac) {
     try {
       if (debug) console.log('Saving credentials to macOS keychain...');
       const args = [
         'add-generic-password',
         '-s', 'rdss-folder-mapper',
-        '-a', username || 'rdss-user',
-        '-w', pass,
         '-U'
       ];
-      if (domain) {
-        args.push('-j', domain);
+      if (creds.username) {
+        args.push('-a', creds.username);
+      }
+      if (creds.password) {
+        args.push('-w', creds.password);
+      }
+      if (creds.domain) {
+        args.push('-j', creds.domain);
       }
       execFileSync('security', args, { stdio: debug ? 'pipe' : 'ignore' });
     } catch (e) {
-      if (debug) console.log('Failed to save to macOS keychain:', (e as Error).message);
+      let msg = (e as Error).message;
+      if (creds.password) {
+        msg = msg.split(creds.password).join('***');
+        msg = msg.split(encodeURIComponent(creds.password)).join('***');
+      }
+      if (debug) console.log('Failed to save to macOS keychain:', msg);
     }
   } else if (!isWindows) {
     try {
@@ -102,15 +107,37 @@ function saveCredentialsToKeychain(creds: { username?: string; password?: string
       const args = [
         'store',
         '--label=RDSS Folder Mapper',
-        'service', 'rdss-folder-mapper',
-        'username', username || 'rdss-user'
+        'service', 'rdss-folder-mapper'
       ];
-      if (domain) {
-        args.push('domain', domain);
+      if (creds.username) {
+        args.push('username', creds.username);
       }
-      execFileSync('secret-tool', args, { input: pass, stdio: ['pipe', debug ? 'pipe' : 'ignore', debug ? 'pipe' : 'ignore'] });
+      if (creds.domain) {
+        args.push('domain', creds.domain);
+      }
+      execFileSync('secret-tool', args, { input: creds.password, stdio: ['pipe', debug ? 'pipe' : 'ignore', debug ? 'pipe' : 'ignore'] });
     } catch (e) {
       if (debug) console.log('Failed to save to Linux secret-tool:', (e as Error).message);
+    }
+  } else {
+    if (debug) console.log('Keychain storage is not supported on Windows.');
+  }
+}
+
+function clearCredentialsFromKeychain(debug: boolean): void {
+  if (isMac) {
+    try {
+      if (debug) console.log('Clearing credentials from macOS keychain...');
+      execSync('security delete-generic-password -s "rdss-folder-mapper"', { stdio: debug ? 'pipe' : 'ignore' });
+    } catch (e) {
+      if (debug) console.log('Failed to clear macOS keychain:', (e as Error).message);
+    }
+  } else if (!isWindows) {
+    try {
+      if (debug) console.log('Clearing credentials from Linux secret-tool...');
+      execSync('secret-tool clear service rdss-folder-mapper', { stdio: debug ? 'pipe' : 'ignore' });
+    } catch (e) {
+      if (debug) console.log('Failed to clear Linux secret-tool:', (e as Error).message);
     }
   } else {
     if (debug) console.log('Keychain storage is not supported on Windows.');
@@ -256,12 +283,18 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
       } catch (error: unknown) {
         process.exitCode = 1;
         let msg = error instanceof Error ? error.message : String(error);
-        if (password) msg = msg.split(password).join('***');
+        if (password) {
+          msg = msg.split(password).join('***');
+          msg = msg.split(encodeURIComponent(password)).join('***');
+        }
         console.error(`Error: Failed to map ${remote} to ${localPath}`);
         console.error(`Reason: ${msg}`);
         if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
           let stderrMsg = String((error as { stderr: unknown }).stderr);
-          if (password) stderrMsg = stderrMsg.split(password).join('***');
+          if (password) {
+            stderrMsg = stderrMsg.split(password).join('***');
+            stderrMsg = stderrMsg.split(encodeURIComponent(password)).join('***');
+          }
           console.error(`Command Output: ${stderrMsg}`);
         }
         if (debug) {
@@ -286,7 +319,10 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
   } catch (error: unknown) {
     process.exitCode = 1;
     let msg = error instanceof Error ? error.message : String(error);
-    if (password) msg = msg.split(password).join('***');
+    if (password) {
+      msg = msg.split(password).join('***');
+      msg = msg.split(encodeURIComponent(password)).join('***');
+    }
     console.error('Error during refresh:', msg);
   }
 }
@@ -373,7 +409,6 @@ program
   .description(
     'A cross-platform command-line interface (CLI) tool that allows you to create local folder mappings to shared network drives effortlessly.',
   )
-  .option('--reset', 'Remove all currently mapped folders')
   .option('--debug', 'Enable debug logging')
   .option('-b, --base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
   .option('-u --username <username>', 'Username for remote mapping')
@@ -383,39 +418,53 @@ program
   .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10), 40)
   .option('-d, --domain <domain>', 'Domain for remote mapping')
   .action((options) => {
-    if (options.reset) {
-      reset(options.debug, options.baseDir);
-    } else {
-      refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath, options.truncate, options.domain).then();
-    }
+    refresh(options.debug, options.baseDir, options.username, options.password, options.folders, options.remotePath, options.truncate, options.domain).then();
   });
 
 program
-  .command('set <key>')
-  .description('Set a credential in the keychain (username, domain, or password)')
-  .action((key) => {
-    const validKeys = ['username', 'domain', 'password'];
-    if (!validKeys.includes(key)) {
-      console.error(`Invalid key: ${key}. Valid options are: ${validKeys.join(', ')}`);
-      process.exit(1);
-    }
+  .command('reset')
+  .description('Remove all currently mapped folders')
+  .action(() => {
+    const opts = program.opts();
+    reset(opts.debug, opts.baseDir);
+  });
 
+program
+  .command('auth')
+  .description('Set credentials in the keychain')
+  .action(() => {
     if (isWindows) {
       console.error('Keychain storage is not supported on Windows.');
       process.exit(1);
     }
 
-    const isPassword = key === 'password';
-    const value = readlineSync.question(`Enter value for ${key}: `, {
-      hideEchoBack: isPassword
+    const debug = program.opts().debug || false;
+
+    let usernameInput = readlineSync.question('Enter username (leave blank to use current user): ');
+    let username = usernameInput.trim() || os.userInfo().username;
+
+    const password = readlineSync.question('Enter password: ', {
+      hideEchoBack: true
     });
 
-    const debug = program.opts().debug || false;
-    const currentCreds = getCredentialsFromKeychain(debug);
-    const newCreds = { ...currentCreds, [key]: value };
+    let domainInput = readlineSync.question('Enter domain (optional): ');
+    let domain = domainInput.trim() || undefined;
 
-    saveCredentialsToKeychain(newCreds, debug);
-    console.log(`Successfully updated ${key} in keychain.`);
+    saveCredentialsToKeychain({ username, password, domain }, debug);
+    console.log('Successfully updated credentials in keychain.');
+  });
+
+program
+  .command('clear-auth')
+  .description('Clear all credentials from the keychain')
+  .action(() => {
+    if (isWindows) {
+      console.error('Keychain storage is not supported on Windows.');
+      process.exit(1);
+    }
+    const debug = program.opts().debug || false;
+    clearCredentialsFromKeychain(debug);
+    console.log('Successfully cleared credentials from keychain.');
   });
 
 program.parse(process.argv);

@@ -89,7 +89,7 @@ describe('Integration Test', () => {
         fs.rmSync('folders.json');
       }
       try {
-        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --reset`, { stdio: 'ignore' });
+        execSync(`npx ts-node index.ts reset --base-dir ${testRdssDir}`, { stdio: 'ignore' });
       } catch (e) {
         // ignore
       }
@@ -224,7 +224,7 @@ describe('Integration Test', () => {
       }
 
       try {
-        execSync(`npx ts-node index.ts --base-dir ${testRdssDir} --reset`, { stdio: 'pipe' });
+        execSync(`npx ts-node index.ts reset --base-dir ${testRdssDir}`, { stdio: 'pipe' });
       } catch (e) {
         // ignore reset failure
       }
