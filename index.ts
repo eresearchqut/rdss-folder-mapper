@@ -192,11 +192,14 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
         }
       } catch (error: unknown) {
         process.exitCode = 1;
-        const msg = error instanceof Error ? error.message : String(error);
+        let msg = error instanceof Error ? error.message : String(error);
+        if (password) msg = msg.split(password).join('***');
         console.error(`Error: Failed to map ${remote} to ${localPath}`);
         console.error(`Reason: ${msg}`);
         if (error && typeof error === 'object' && 'stderr' in error && (error as { stderr?: unknown }).stderr) {
-          console.error(`Command Output: ${String((error as { stderr: unknown }).stderr)}`);
+          let stderrMsg = String((error as { stderr: unknown }).stderr);
+          if (password) stderrMsg = stderrMsg.split(password).join('***');
+          console.error(`Command Output: ${stderrMsg}`);
         }
         if (debug) {
           console.error(`Debug Error: ${msg}`);
@@ -219,7 +222,8 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
     console.log('Refresh complete.');
   } catch (error: unknown) {
     process.exitCode = 1;
-    const msg = error instanceof Error ? error.message : String(error);
+    let msg = error instanceof Error ? error.message : String(error);
+    if (password) msg = msg.split(password).join('***');
     console.error('Error during refresh:', msg);
   }
 }
