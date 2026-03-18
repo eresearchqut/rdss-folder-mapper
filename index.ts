@@ -65,6 +65,11 @@ async function refresh(debug: boolean = false, baseDir: string = BASE_DIR, usern
       username = username || keychainCreds.username;
       password = password || keychainCreds.password;
     }
+
+    if (!username && password) {
+      username = os.userInfo().username;
+      if (debug) console.log(`No username provided, defaulting to executing user: ${username}`);
+    }
     let folders: DriveMapping[] = [];
     let configRemotePath: string | undefined;
     try {
