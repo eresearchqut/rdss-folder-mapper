@@ -8,3 +8,7 @@ Write-Host "Downloading latest rdss-folder-mapper for Windows..."
 Invoke-WebRequest -Uri $url -OutFile $output
 
 Write-Host "Downloaded successfully to .\$output"
+
+if ($PSCommandPath) {
+    Remove-Item -Path $PSCommandPath -Force
+}
