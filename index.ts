@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import { startCase } from 'lodash';
 import truncate from '@stdlib/string-truncate';
 import readlineSync from 'readline-sync';
+import signale from 'signale';
 
 export const isWindows = () => {
   return os.platform() === 'win32';
@@ -58,7 +59,7 @@ interface DriveMapping {
 
 const getMacCredentials = (debug: boolean) => {
   try {
-    if (debug) console.log('Attempting to read credentials from macOS keychain...');
+    if (debug) signale.debug('Attempting to read credentials from macOS keychain...');
     // Note: `security` writes the password to stderr, and attributes to stdout. We catch both by not redirecting stderr to ignore.
     const stdout = execSync('security find-generic-password -s "rdss-folder-mapper"', {
       encoding: 'utf8',
@@ -73,7 +74,7 @@ const getMacCredentials = (debug: boolean) => {
       stdout.match(/"gena"<blob>="([^"]+)"/) || stdout.match(/"icmt"<blob>="([^"]+)"/);
     const password = stderr.trim();
     if (accountMatch && password) {
-      if (debug) console.log('Credentials successfully retrieved from macOS keychain.');
+      if (debug) signale.debug('Credentials successfully retrieved from macOS keychain.');
       let username = accountMatch[1];
       let domain = domainMatch ? domainMatch[1] : undefined;
       if (!domain && username.includes('\\')) {
@@ -84,14 +85,14 @@ const getMacCredentials = (debug: boolean) => {
       return { username, password, domain };
     }
   } catch (e) {
-    if (debug) console.log('Failed to read from macOS keychain:', (e as Error).message);
+    if (debug) signale.debug('Failed to read from macOS keychain:', (e as Error).message);
   }
   return {};
 };
 
 const getLinuxCredentials = (debug: boolean) => {
   try {
-    if (debug) console.log('Attempting to read credentials from Linux secret-tool...');
+    if (debug) signale.debug('Attempting to read credentials from Linux secret-tool...');
     const searchOutput = execSync('secret-tool search --all service rdss-folder-mapper', {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
@@ -103,7 +104,7 @@ const getLinuxCredentials = (debug: boolean) => {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     if (accountMatch && password) {
-      if (debug) console.log('Credentials successfully retrieved from Linux secret-tool.');
+      if (debug) signale.debug('Credentials successfully retrieved from Linux secret-tool.');
       let username = accountMatch[1].trim();
       let domain = domainMatch ? domainMatch[1].trim() : undefined;
       if (!domain && username.includes('\\')) {
@@ -114,7 +115,7 @@ const getLinuxCredentials = (debug: boolean) => {
       return { username, password, domain };
     }
   } catch (e) {
-    if (debug) console.log('Failed to read from Linux secret-tool:', (e as Error).message);
+    if (debug) signale.debug('Failed to read from Linux secret-tool:', (e as Error).message);
   }
   return {};
 };
@@ -139,7 +140,7 @@ const saveMacCredentials = (
   debug: boolean,
 ): void => {
   try {
-    if (debug) console.log('Saving credentials to macOS keychain...');
+    if (debug) signale.debug('Saving credentials to macOS keychain...');
     const args = ['add-generic-password', '-s', 'rdss-folder-mapper', '-U'];
     if (creds.username) {
       args.push('-a', creds.username);
@@ -157,7 +158,7 @@ const saveMacCredentials = (
       msg = msg.split(creds.password).join('***');
       msg = msg.split(encodeURIComponent(creds.password)).join('***');
     }
-    if (debug) console.log('Failed to save to macOS keychain:', msg);
+    if (debug) signale.debug('Failed to save to macOS keychain:', msg);
   }
 };
 
@@ -166,7 +167,7 @@ const saveLinuxCredentials = (
   debug: boolean,
 ): void => {
   try {
-    if (debug) console.log('Saving credentials to Linux secret-tool...');
+    if (debug) signale.debug('Saving credentials to Linux secret-tool...');
     const args = ['store', '--label=RDSS Folder Mapper', 'service', 'rdss-folder-mapper'];
     if (creds.username) {
       args.push('username', creds.username);
@@ -179,7 +180,7 @@ const saveLinuxCredentials = (
       stdio: ['pipe', debug ? 'pipe' : 'ignore', debug ? 'pipe' : 'ignore'],
     });
   } catch (e) {
-    if (debug) console.log('Failed to save to Linux secret-tool:', (e as Error).message);
+    if (debug) signale.debug('Failed to save to Linux secret-tool:', (e as Error).message);
   }
 };
 
@@ -192,29 +193,29 @@ const saveCredentialsToKeychain = (
   } else if (!isWindows()) {
     saveLinuxCredentials(creds, debug);
   } else {
-    if (debug) console.log('Keychain storage is not supported on Windows.');
+    if (debug) signale.debug('Keychain storage is not supported on Windows.');
   }
 };
 
 const clearMacCredentials = (debug: boolean): void => {
   try {
-    if (debug) console.log('Clearing credentials from macOS keychain...');
+    if (debug) signale.debug('Clearing credentials from macOS keychain...');
     execSync('security delete-generic-password -s "rdss-folder-mapper"', {
       stdio: debug ? 'pipe' : 'ignore',
     });
   } catch (e) {
-    if (debug) console.log('Failed to clear macOS keychain:', (e as Error).message);
+    if (debug) signale.debug('Failed to clear macOS keychain:', (e as Error).message);
   }
 };
 
 const clearLinuxCredentials = (debug: boolean): void => {
   try {
-    if (debug) console.log('Clearing credentials from Linux secret-tool...');
+    if (debug) signale.debug('Clearing credentials from Linux secret-tool...');
     execSync('secret-tool clear service rdss-folder-mapper', {
       stdio: debug ? 'pipe' : 'ignore',
     });
   } catch (e) {
-    if (debug) console.log('Failed to clear Linux secret-tool:', (e as Error).message);
+    if (debug) signale.debug('Failed to clear Linux secret-tool:', (e as Error).message);
   }
 };
 
@@ -224,7 +225,7 @@ const clearCredentialsFromKeychain = (debug: boolean): void => {
   } else if (!isWindows()) {
     clearLinuxCredentials(debug);
   } else {
-    if (debug) console.log('Keychain storage is not supported on Windows.');
+    if (debug) signale.debug('Keychain storage is not supported on Windows.');
   }
 };
 
@@ -262,7 +263,7 @@ const resolveCredentials = (
   if (!username && password) {
     username = os.userInfo().username;
     if (options.debug)
-      console.log(`No username provided, defaulting to executing user: ${username}`);
+      signale.info(`No username provided, defaulting to executing user: ${username}`);
   }
   return { username, password, domain };
 };
@@ -347,16 +348,16 @@ const handleMountError = (
 ) => {
   process.exitCode = 1;
   const msg = sanitizeErrorMessage(error, password);
-  console.error(`Error: Failed to map ${remote} to ${localPath}`);
-  console.error(`Reason: ${msg}`);
+  signale.error(`Error: Failed to map ${remote} to ${localPath}`);
+  signale.error(`Reason: ${msg}`);
 
   const stderrMsg = sanitizeStderr(error, password);
   if (stderrMsg) {
-    console.error(`Command Output: ${stderrMsg}`);
+    signale.error(`Command Output: ${stderrMsg}`);
   }
 
   if (debug) {
-    console.error(`Debug Error: ${msg}`);
+    signale.error(`Debug Error: ${msg}`);
   }
 
   try {
@@ -366,7 +367,7 @@ const handleMountError = (
     if (fs.existsSync(mountPath) && fs.readdirSync(mountPath).length === 0) {
       fs.rmdirSync(mountPath);
       if (debug) {
-        console.log(`Debug: Cleaned up empty folder ${mountPath}`);
+        signale.debug(`Cleaned up empty folder ${mountPath}`);
       }
     }
   } catch {
@@ -397,11 +398,11 @@ const mountWindows = (options: MountOptions) => {
   if (username && password) {
     const userWithDomain = domain ? `${domain}\\${username}` : username;
     const cmd = `net use "${remote}" "${password}" /user:"${userWithDomain}"`;
-    if (debug) console.log(`Executing: net use "${remote}" "***" /user:"${userWithDomain}"`);
+    if (debug) signale.debug(`Executing: net use "${remote}" "***" /user:"${userWithDomain}"`);
     execSync(cmd, { stdio: debug ? 'pipe' : 'ignore' });
   }
   const mklinkCmd = `mklink /D "${localPath}" "${remote}"`;
-  if (debug) console.log(`Executing: ${mklinkCmd}`);
+  if (debug) signale.debug(`Executing: ${mklinkCmd}`);
   execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
 };
 
@@ -420,7 +421,7 @@ const mountMac = (options: MountOptions) => {
       `smb://${domainPrefix}${encodeURIComponent(username)}:***@`,
     );
   }
-  if (debug) console.log(`Executing: mount_smbfs "${macRemoteLog}" "${mountPath}"`);
+  if (debug) signale.debug(`Executing: mount_smbfs "${macRemoteLog}" "${mountPath}"`);
   execSync(`mount_smbfs "${macRemote}" "${mountPath}"`, {
     stdio: debug ? 'pipe' : 'ignore',
   });
@@ -440,7 +441,9 @@ const mountLinux = (options: MountOptions) => {
   const mountOptsLog =
     username && password ? `username=${username},password=***,domain=${domain}` : 'guest';
   if (debug)
-    console.log(`Executing: sudo mount -t cifs -o ${mountOptsLog} "${linuxRemote}" "${mountPath}"`);
+    signale.debug(
+      `Executing: sudo mount -t cifs -o ${mountOptsLog} "${linuxRemote}" "${mountPath}"`,
+    );
   execSync(`sudo mount -t cifs -o ${mountOpts} "${linuxRemote}" "${mountPath}"`, {
     stdio: debug ? 'pipe' : 'ignore',
   });
@@ -484,7 +487,7 @@ const processDriveMapping = ({
 
   if (isMounted(localPath, mountPath)) {
     if (debug) {
-      console.log(`Debug: Mount already exists at ${mountPath}, skipping.`);
+      signale.debug(`Mount already exists at ${mountPath}, skipping.`);
     }
     if (!isWindows() && !fs.existsSync(localPath)) {
       fs.symlinkSync(mountPath, localPath);
@@ -496,7 +499,7 @@ const processDriveMapping = ({
     fs.mkdirSync(mountPath, { recursive: true });
   }
 
-  console.log(`Mapping ${remote} to ${localPath}`);
+  signale.info(`Mapping ${remote} to ${localPath}`);
 
   try {
     if (isWindows()) {
@@ -507,7 +510,7 @@ const processDriveMapping = ({
       mountLinux({ remote, localPath, mountPath, username, password, domain, debug });
     }
     if (debug) {
-      console.log(`Debug: Successfully mounted ${remote} to ${localPath}`);
+      signale.debug(`Successfully mounted ${remote} to ${localPath}`);
     }
   } catch (error: unknown) {
     handleMountError(error, remote, localPath, mountPath, password, debug);
@@ -523,7 +526,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     truncateLength = 40,
   } = options;
 
-  console.log('Refreshing drive mappings...');
+  signale.info('Refreshing drive mappings...');
   try {
     const { username, password, domain } = resolveCredentials(options);
     const configData = loadFoldersConfig(foldersFile);
@@ -544,25 +547,25 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         debug,
       });
     }
-    console.log('Refresh complete.');
+    signale.success('Refresh complete.');
   } catch (error: unknown) {
     process.exitCode = 1;
     const msg = sanitizeErrorMessage(error, options.password);
-    console.error('Error during refresh:', msg);
+    signale.error('Error during refresh:', msg);
   }
 };
 
 const handleUnmountError = (error: unknown, pathName: string, debug: boolean) => {
   process.exitCode = 1;
   const msg = error instanceof Error ? error.message : String(error);
-  console.error(`Error: Failed to unmount or remove ${pathName}`);
-  console.error(`Reason: ${msg}`);
+  signale.error(`Error: Failed to unmount or remove ${pathName}`);
+  signale.error(`Reason: ${msg}`);
   const stderrMsg = sanitizeStderr(error);
   if (stderrMsg) {
-    console.error(`Command Output: ${stderrMsg}`);
+    signale.error(`Command Output: ${stderrMsg}`);
   }
   if (debug) {
-    console.error(`Debug Error: ${msg}`);
+    signale.error(`Debug Error: ${msg}`);
   }
 };
 
@@ -571,7 +574,7 @@ const resetMountsDir = (mountsDir: string, debug: boolean) => {
     const mounts = fs.readdirSync(mountsDir);
     for (const mountFolder of mounts) {
       const mountPath = path.join(mountsDir, mountFolder);
-      console.log(`Unmounting ${mountPath}`);
+      signale.info(`Unmounting ${mountPath}`);
       try {
         if (isMac()) {
           execSync(`umount "${mountPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
@@ -596,7 +599,7 @@ const resetBaseDirMappings = (baseDir: string, debug: boolean) => {
   for (const folder of folders) {
     if (folder === '.mounts') continue;
     const localPath = path.join(baseDir, folder);
-    console.log(`Removing mapping for ${localPath}`);
+    signale.info(`Removing mapping for ${localPath}`);
     try {
       if (isWindows()) {
         fs.rmSync(localPath, { recursive: true, force: true });
@@ -620,13 +623,13 @@ const resetBaseDirMappings = (baseDir: string, debug: boolean) => {
 };
 
 export const reset = (debug: boolean = false, baseDir: string = BASE_DIR): void => {
-  console.log('Resetting folder mappings...');
+  signale.info('Resetting folder mappings...');
   if (fs.existsSync(baseDir)) {
     const mountsDir = path.join(baseDir, '.mounts');
     resetMountsDir(mountsDir, debug);
     resetBaseDirMappings(baseDir, debug);
   }
-  console.log('Reset complete.');
+  signale.success('Reset complete.');
 };
 
 const program = new Command();
@@ -652,7 +655,7 @@ program
         delete parsed.domain;
         configOptions = parsed;
       } catch (e) {
-        console.error('Warning: Failed to parse config.json', (e as Error).message);
+        signale.error('Warning: Failed to parse config.json', (e as Error).message);
       }
     }
 
@@ -670,10 +673,10 @@ program
     if (finalOptions.debug) {
       const logOptions = { ...finalOptions };
       if (logOptions.password) logOptions.password = '***';
-      console.log('Debug: Using options:', JSON.stringify(logOptions, null, 2));
+      signale.debug('Using options:', JSON.stringify(logOptions, null, 2));
     }
 
-    refresh(finalOptions).catch(console.error);
+    refresh(finalOptions).catch((e) => signale.error(e));
   });
 
 program
@@ -689,7 +692,7 @@ program
   .description('Set credentials in the keychain')
   .action(() => {
     if (isWindows()) {
-      console.error('Keychain storage is not supported on Windows.');
+      signale.error('Keychain storage is not supported on Windows.');
       process.exit(1);
     }
 
@@ -708,7 +711,7 @@ program
     const domain = domainInput.trim() || undefined;
 
     saveCredentialsToKeychain({ username, password, domain }, debug);
-    console.log('Successfully updated credentials in keychain.');
+    signale.success('Successfully updated credentials in keychain.');
   });
 
 program
@@ -716,12 +719,12 @@ program
   .description('Clear all credentials from the keychain')
   .action(() => {
     if (isWindows()) {
-      console.error('Keychain storage is not supported on Windows.');
+      signale.error('Keychain storage is not supported on Windows.');
       process.exit(1);
     }
     const debug = program.opts().debug || false;
     clearCredentialsFromKeychain(debug);
-    console.log('Successfully cleared credentials from keychain.');
+    signale.success('Successfully cleared credentials from keychain.');
   });
 
 program.parse(process.argv);

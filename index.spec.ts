@@ -184,7 +184,7 @@ describe('Integration Test', () => {
           env,
           stdio: 'pipe',
         });
-        expect(output.toString()).toContain('Debug: Using options:');
+        expect(output.toString()).toContain('Using options:');
         expect(output.toString()).toContain('"truncateLength": 15');
       } finally {
         if (fs.existsSync(customConfigPath)) {
