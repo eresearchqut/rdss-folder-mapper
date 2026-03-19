@@ -2,8 +2,15 @@ import { GenericContainer, Wait, StartedTestContainer } from 'testcontainers';
 import net from 'net';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execSync, exec } from 'child_process';
 import os from 'os';
+import {
+  CognitoIdentityProviderClient,
+  CreateUserPoolCommand,
+  CreateUserPoolClientCommand,
+  AdminCreateUserCommand,
+  AdminSetUserPasswordCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
 
 const isWindows = () => {
   return os.platform() === 'win32';
@@ -383,5 +390,111 @@ describe('Integration Test', () => {
       ]);
       expect(aliceDenyExec.exitCode).not.toBe(0);
     });
+  });
+
+  describe('login action', () => {
+    let cognitoContainer: StartedTestContainer;
+    let cognitoHost: string;
+    let cognitoPort: number;
+    let userPoolId: string;
+    let clientId: string;
+
+    beforeAll(async () => {
+      cognitoContainer = await new GenericContainer('jagregory/cognito-local:latest')
+        .withExposedPorts(9229)
+        .start();
+
+      cognitoHost = cognitoContainer.getHost();
+      cognitoPort = cognitoContainer.getMappedPort(9229);
+
+      const client = new CognitoIdentityProviderClient({
+        region: 'local',
+        endpoint: `http://${cognitoHost}:${cognitoPort}`,
+        credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
+      });
+
+      const poolRes = await client.send(new CreateUserPoolCommand({ PoolName: 'test-pool' }));
+      userPoolId = poolRes.UserPool!.Id as string;
+
+      const clientRes = await client.send(
+        new CreateUserPoolClientCommand({
+          UserPoolId: userPoolId,
+          ClientName: 'test-client',
+          GenerateSecret: false,
+          ExplicitAuthFlows: ['USER_PASSWORD_AUTH'],
+          AllowedOAuthFlows: ['code'],
+          AllowedOAuthFlowsUserPoolClient: true,
+          AllowedOAuthScopes: ['openid', 'email', 'profile'],
+          CallbackURLs: ['http://localhost:3000/callback'],
+          SupportedIdentityProviders: ['COGNITO'],
+        }),
+      );
+      clientId = clientRes.UserPoolClient!.ClientId as string;
+
+      await client.send(
+        new AdminCreateUserCommand({
+          UserPoolId: userPoolId,
+          Username: 'testuser@example.com',
+          MessageAction: 'SUPPRESS',
+        }),
+      );
+
+      await client.send(
+        new AdminSetUserPasswordCommand({
+          UserPoolId: userPoolId,
+          Username: 'testuser@example.com',
+          Password: 'Password1!',
+          Permanent: true,
+        }),
+      );
+    }, 60000);
+
+    afterAll(async () => {
+      if (cognitoContainer) {
+        await cognitoContainer.stop();
+      }
+    });
+
+    test('should start local server, receive code and attempt to exchange token', async () => {
+      const authUrl = `http://${cognitoHost}:${cognitoPort}/${userPoolId}/oauth2/authorize`;
+      const tokenUrl = `http://${cognitoHost}:${cognitoPort}/${userPoolId}/oauth2/token`;
+
+      const child = exec(
+        `npx ts-node index.ts login --auth-url "${authUrl}" --token-url "${tokenUrl}" --client-id "${clientId}"`,
+      );
+
+      let stdout = '';
+      let stderr = '';
+      child.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
+      child.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      // Wait for the server to start by polling the callback endpoint
+      let serverStarted = false;
+      for (let i = 0; i < 15; i++) {
+        try {
+          await fetch('http://localhost:3000/callback?code=mock_auth_code');
+          serverStarted = true;
+          break;
+        } catch {
+          // not started yet
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+
+      expect(serverStarted).toBe(true);
+
+      // Wait for process to exit
+      await new Promise<void>((resolve) => {
+        child.on('close', () => resolve());
+      });
+
+      // Since jagregory/cognito-local does not support /oauth2/token, it will fail to exchange the code
+      // We should verify that the CLI handled the callback and attempted the exchange.
+      expect(stdout + stderr).toContain('Failed to exchange code for token');
+    }, 30000);
   });
 });
