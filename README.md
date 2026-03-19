@@ -122,6 +122,7 @@ Commands:
   reset                      Remove all currently mapped folders
   auth                       Set credentials in the keychain
   clear-auth                 Clear all credentials from the keychain
+  login                      Perform OAuth login to retrieve a token for fetching remote folders.json
 ```
 
 ## Configuration
@@ -182,6 +183,29 @@ To clear these saved credentials:
 
 ```bash
 rdss-folder-mapper clear-auth
+```
+
+### Remote Configuration & OAuth Login
+
+You can download your `folders.json` from a protected remote URL by providing an HTTP/HTTPS path via the `-f, --folders` option or in your `config.json`.
+When fetching the remote file, the CLI will automatically include an authorization token if you have previously logged in.
+
+To perform an OAuth login and save the token securely to your keychain:
+
+```bash
+rdss-folder-mapper login --auth-url <authorization_url> --token-url <token_exchange_url> --client-id <your_client_id>
+```
+
+This command will:
+1. Start a local server (default port 3000) to receive the callback.
+2. Open your default web browser to the provided authorization URL.
+3. Capture the authorization code and exchange it for a token at the token URL.
+4. Save the returned `access_token` to your system keychain.
+
+You can then run the `refresh` command with a remote URL:
+
+```bash
+rdss-folder-mapper -f https://api.example.com/my-folders.json
 ```
 
 

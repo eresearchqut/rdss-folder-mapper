@@ -34,6 +34,7 @@
     "@stdlib/string-truncate": "^0.2.3",
     "commander": "^14.0.3",
     "lodash": "^4.17.23",
+    "open": "^8.4.2",
     "readline-sync": "^1.4.10",
     "signale": "^1.4.0"
   },
