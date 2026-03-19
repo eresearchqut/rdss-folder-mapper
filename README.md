@@ -46,7 +46,8 @@ Available binaries:
 - [🍎 macOS (`rdss-folder-mapper-macos`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos)
 - [🐧 Linux (`rdss-folder-mapper-linux`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux)
 
-## Configuration
+
+### Folders Mapping (`folders.json`)
 
 The CLI reads from a local `folders.json` file (in the same directory you run the command from) that returns a JSON mapping containing a listing of all your available folders. Each drive entry includes:
 
@@ -109,6 +110,33 @@ Commands:
   auth                       Set credentials in the keychain
   clear-auth                 Clear all credentials from the keychain
 ```
+
+## Configuration
+
+### Default Options (`config.json`)
+
+You can provide default CLI options using a `config.json` file in the same directory as the executable. The CLI will automatically read this file and apply the options, though any options provided directly via the command line will take precedence.
+
+Supported options in `config.json`:
+
+- `debug`: Enable debug logging (`boolean`)
+- `baseDir`: Custom base folder location (`string`)
+- `foldersFile`: Custom folders JSON file location (`string`)
+- `remotePath`: Custom remote path (`string`)
+- `truncateLength`: Truncate length for folder names (`number`)
+
+Example `config.json`:
+
+```json
+{
+  "debug": true,
+  "baseDir": "~/MyRDSS",
+  "truncateLength": 30
+}
+```
+
+*Note: For security reasons, `username`, `password`, and `domain` cannot be specified in `config.json`. Use the `auth` command instead.*
+
 
 ### Refresh (Default)
 

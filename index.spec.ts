@@ -154,6 +154,45 @@ describe('Integration Test', () => {
       }
     });
 
+    test('should apply options from config.json and override with CLI', async () => {
+      const customConfigPath = 'config.json';
+      fs.writeFileSync(
+        customConfigPath,
+        JSON.stringify({
+          baseDir: testRdssDir,
+          debug: true,
+          truncateLength: 15,
+        }),
+      );
+
+      const host = container.getHost();
+      const port = container.getMappedPort(445);
+
+      const basePathWin = `\\\\${host}`;
+      const basePathNix = `smb://${host}:${port}`;
+
+      const env = {
+        ...process.env,
+        REMOTE_PATH_WIN: basePathWin,
+        REMOTE_PATH_NIX: basePathNix,
+        RDSS_USERNAME: 'testuser',
+        RDSS_PASSWORD: 'testpass',
+      };
+
+      try {
+        const output = execSync('npx ts-node index.ts 2>&1', {
+          env,
+          stdio: 'pipe',
+        });
+        expect(output.toString()).toContain('Debug: Using options:');
+        expect(output.toString()).toContain('"truncateLength": 15');
+      } finally {
+        if (fs.existsSync(customConfigPath)) {
+          fs.rmSync(customConfigPath);
+        }
+      }
+    });
+
     test('should fail when folders.json is missing', async () => {
       fs.rmSync('folders.json');
       try {

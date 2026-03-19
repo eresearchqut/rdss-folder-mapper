@@ -234,7 +234,7 @@ interface RefreshOptions {
   username?: string;
   password?: string;
   foldersFile?: string;
-  cliRemotePath?: string;
+  remotePath?: string;
   truncateLength?: number;
   domain?: string;
 }
@@ -519,7 +519,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     debug = false,
     baseDir = BASE_DIR,
     foldersFile = 'folders.json',
-    cliRemotePath,
+    remotePath,
     truncateLength = 40,
   } = options;
 
@@ -529,7 +529,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     const configData = loadFoldersConfig(foldersFile);
     const mountsDir = setupBaseDirectory(baseDir, debug);
 
-    const finalRemotePath = cliRemotePath || configData.remotePath;
+    const finalRemotePath = remotePath || configData.remotePath;
 
     for (const drive of configData.folders) {
       processDriveMapping({
@@ -640,24 +640,40 @@ program
   .option('-b, --base-dir <path>', 'Custom base folder location (default: ~/RDSS)')
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('-r, --remote-path <path>', 'Custom remote path')
-  .option(
-    '-t, --truncate <number>',
-    'Truncate length for folder names',
-    (val) => parseInt(val, 10),
-    40,
-  )
+  .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10))
   .option('-d, --domain <domain>', 'Domain for remote mapping')
   .action((options) => {
-    refresh({
-      debug: options.debug,
-      baseDir: options.baseDir,
+    let configOptions: Partial<RefreshOptions> = {};
+    if (fs.existsSync('config.json')) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync('config.json', 'utf8'));
+        delete parsed.username;
+        delete parsed.password;
+        delete parsed.domain;
+        configOptions = parsed;
+      } catch (e) {
+        console.error('Warning: Failed to parse config.json', (e as Error).message);
+      }
+    }
+
+    const finalOptions: RefreshOptions = {
+      debug: options.debug ?? configOptions.debug,
+      baseDir: options.baseDir ?? configOptions.baseDir,
       username: process.env.RDSS_USERNAME,
       password: process.env.RDSS_PASSWORD,
-      foldersFile: options.folders,
-      cliRemotePath: options.remotePath,
-      truncateLength: options.truncate,
-      domain: options.domain,
-    }).catch(console.error);
+      foldersFile: options.folders ?? configOptions.foldersFile,
+      remotePath: options.remotePath ?? configOptions.remotePath,
+      truncateLength: options.truncate ?? configOptions.truncateLength,
+      domain: options.domain ?? process.env.RDSS_DOMAIN,
+    };
+
+    if (finalOptions.debug) {
+      const logOptions = { ...finalOptions };
+      if (logOptions.password) logOptions.password = '***';
+      console.log('Debug: Using options:', JSON.stringify(logOptions, null, 2));
+    }
+
+    refresh(finalOptions).catch(console.error);
   });
 
 program
