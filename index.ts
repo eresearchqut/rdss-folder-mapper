@@ -283,12 +283,32 @@ const loadFoldersConfig = (foldersFile: string): ConfigData => {
   }
 };
 
+const getIgnoredItems = (): string[] => {
+  const ignores = ['.mounts', '.DS_Store', 'desktop.ini', 'Thumbs.db', '.mountignore'];
+  const ignorePath = '.mountignore';
+  if (fs.existsSync(ignorePath)) {
+    try {
+      const content = fs.readFileSync(ignorePath, 'utf8');
+      content.split(/\r?\n/).forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          ignores.push(trimmed);
+        }
+      });
+    } catch {
+      // ignore
+    }
+  }
+  return ignores;
+};
+
 const setupBaseDirectory = (baseDir: string, debug: boolean): string => {
   const mountsDir = path.join(baseDir, '.mounts');
   if (!fs.existsSync(baseDir)) {
     fs.mkdirSync(baseDir, { recursive: true });
   } else {
-    const existingItems = fs.readdirSync(baseDir).filter((item) => item !== '.mounts');
+    const ignoreList = getIgnoredItems();
+    const existingItems = fs.readdirSync(baseDir).filter((item) => !ignoreList.includes(item));
     if (existingItems.length > 0) {
       reset(debug, baseDir);
     }
@@ -594,10 +614,10 @@ const resetMountsDir = (mountsDir: string, debug: boolean) => {
   }
 };
 
-const resetBaseDirMappings = (baseDir: string, debug: boolean) => {
+const resetBaseDirMappings = (baseDir: string, debug: boolean, ignoreList: string[]) => {
   const folders = fs.readdirSync(baseDir);
   for (const folder of folders) {
-    if (folder === '.mounts') continue;
+    if (ignoreList.includes(folder)) continue;
     const localPath = path.join(baseDir, folder);
     signale.info(`Removing mapping for ${localPath}`);
     try {
@@ -626,8 +646,9 @@ export const reset = (debug: boolean = false, baseDir: string = BASE_DIR): void 
   signale.info('Resetting folder mappings...');
   if (fs.existsSync(baseDir)) {
     const mountsDir = path.join(baseDir, '.mounts');
+    const ignoreList = getIgnoredItems();
     resetMountsDir(mountsDir, debug);
-    resetBaseDirMappings(baseDir, debug);
+    resetBaseDirMappings(baseDir, debug, ignoreList);
   }
   signale.success('Reset complete.');
 };

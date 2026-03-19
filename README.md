@@ -81,6 +81,19 @@ This configuration will result in the following folder structure:
 └── Project Beta Data [PRJ456]/
 ```
 
+### Ignore Paths (`.mountignore`)
+
+You can create a `.mountignore` file in the same directory as the executable to specify local folder names that should be ignored and kept intact during reset operations.
+
+Example `.mountignore`:
+
+```text
+my-custom-folder
+another-folder
+```
+
+*Note: Common metadata paths like `.DS_Store`, `desktop.ini`, and `Thumbs.db` are ignored by default.*
+
 ## Usage
 
 Once installed/downloaded, you can use the `rdss-folder-mapper` command to manage your network drives. The CLI primarily operates with two actions: `refresh` (default) and `reset`.
