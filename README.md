@@ -42,10 +42,10 @@ curl -fsSL https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/do
 Alternatively, you can download the compiled binaries for your operating system from the releases page (or by building them locally with `npm run build`).
 
 Available binaries:
+
 - [🪟 Windows (`rdss-folder-mapper-win.exe`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe)
 - [🍎 macOS (`rdss-folder-mapper-macos`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos)
 - [🐧 Linux (`rdss-folder-mapper-linux`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux)
-
 
 ### Folders Mapping (`folders.json`)
 
@@ -59,7 +59,7 @@ Example `folders.json`:
 
 ```json
 {
-  "folders": [  
+  "folders": [
     {
       "id": "PRJ123",
       "title": "Project Alpha Data",
@@ -92,7 +92,7 @@ my-custom-folder
 another-folder
 ```
 
-*Note: Common metadata paths like `.DS_Store`, `desktop.ini`, and `Thumbs.db` are ignored by default.*
+_Note: Common metadata paths like `.DS_Store`, `desktop.ini`, and `Thumbs.db` are ignored by default._
 
 ## Usage
 
@@ -149,8 +149,7 @@ Example `config.json`:
 }
 ```
 
-*Note: For security reasons, `username`, `password`, and `domain` cannot be specified in `config.json`. Use the `auth` command instead.*
-
+_Note: For security reasons, `username`, `password`, and `domain` cannot be specified in `config.json`. Use the `auth` command instead._
 
 ### Refresh (Default)
 
@@ -177,6 +176,7 @@ To store your credentials securely in the system keychain (macOS Keychain or Lin
 ```bash
 rdss-folder-mapper auth
 ```
+
 You will be prompted to enter your username, password (which will be hidden), and an optional domain.
 
 To clear these saved credentials:
@@ -197,6 +197,7 @@ rdss-folder-mapper login --auth-url <authorization_url> --token-url <token_excha
 ```
 
 This command will:
+
 1. Start a local server (default port 3000) to receive the callback.
 2. Open your default web browser to the provided authorization URL.
 3. Capture the authorization code and exchange it for a token at the token URL.
@@ -207,6 +208,3 @@ You can then run the `refresh` command with a remote URL:
 ```bash
 rdss-folder-mapper -f https://api.example.com/my-folders.json
 ```
-
-
-

@@ -810,44 +810,57 @@ program
     signale.success('Successfully cleared credentials from keychain.');
   });
 
-program
-  .command('login')
-  .description('Perform OAuth login to retrieve a token for fetching remote folders.json')
-  .option('--auth-url <url>', 'The OAuth authorization URL')
-  .option('--token-url <url>', 'The OAuth token exchange URL')
-  .option('--client-id <id>', 'The OAuth client ID')
-  .option('-p, --port <port>', 'Local port to listen for the callback (default: 3000)', '3000')
-  .action(async (options) => {
-    if (isWindows()) {
-      signale.error('Keychain storage for token is currently only supported on macOS and Linux.');
-      process.exit(1);
+export interface LoginOptions {
+  authUrl: string;
+  tokenUrl: string;
+  clientId: string;
+  port: number;
+  debug: boolean;
+}
+
+export const performLogin = async (options: LoginOptions): Promise<string | undefined> => {
+  const { authUrl, tokenUrl, clientId, port, debug } = options;
+
+  if (!isWindows()) {
+    const existingToken = getTokenFromKeychain(debug);
+    if (existingToken) {
+      try {
+        const payloadBase64 = existingToken.split('.')[1];
+        if (payloadBase64) {
+          const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
+          const payload = JSON.parse(payloadJson);
+          if (!payload.exp || payload.exp * 1000 > Date.now()) {
+            if (debug) signale.debug('Valid token found in keychain.');
+            return existingToken;
+          }
+        }
+      } catch {
+        if (debug) signale.debug('Failed to parse existing token from keychain.');
+      }
     }
-    const debug = program.opts().debug || false;
-    const authUrl = options.authUrl || process.env.RDSS_AUTH_URL;
-    const tokenUrl = options.tokenUrl || process.env.RDSS_TOKEN_URL;
-    const clientId = options.clientId || process.env.RDSS_CLIENT_ID;
-    const port = parseInt(options.port, 10);
+  }
 
-    if (!authUrl || !tokenUrl || !clientId) {
-      signale.error(
-        'Missing required OAuth parameters. Please provide --auth-url, --token-url, and --client-id, or set RDSS_AUTH_URL, RDSS_TOKEN_URL, RDSS_CLIENT_ID environment variables.',
-      );
-      process.exit(1);
-    }
+  if (!authUrl || !tokenUrl || !clientId) {
+    signale.error(
+      'Missing required OAuth parameters. Please provide --auth-url, --token-url, and --client-id, or set RDSS_AUTH_URL, RDSS_TOKEN_URL, RDSS_CLIENT_ID environment variables.',
+    );
+    process.exit(1);
+  }
 
-    const http = require('http');
-    const { URL } = require('url');
-    let openPkg;
-    try {
-      openPkg = require('open');
-    } catch {
-      signale.error('Could not load the open module.');
-      process.exit(1);
-    }
+  const http = require('http');
+  const { URL } = require('url');
+  let openPkg;
+  try {
+    openPkg = require('open');
+  } catch {
+    signale.error('Could not load the open module.');
+    process.exit(1);
+  }
 
-    const redirectUri = `http://localhost:${port}/callback`;
-    const fullAuthUrl = `${authUrl}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+  const redirectUri = `http://localhost:${port}/callback`;
+  const fullAuthUrl = `${authUrl}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
 
+  return new Promise((resolve) => {
     const server = http.createServer(
       async (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
         try {
@@ -882,8 +895,12 @@ program
 
                 const tokenData = (await response.json()) as { access_token?: string };
                 if (tokenData.access_token) {
-                  saveTokenToKeychain(tokenData.access_token, debug);
+                  if (!isWindows()) {
+                    saveTokenToKeychain(tokenData.access_token, debug);
+                  }
                   signale.success('Successfully logged in and saved token.');
+                  server.close(() => resolve(tokenData.access_token));
+                  return;
                 } else {
                   signale.error('No access_token found in response.');
                 }
@@ -918,6 +935,30 @@ program
         signale.error('Failed to open browser, please navigate to the URL manually:', fullAuthUrl);
       }
     });
+  });
+};
+
+program
+  .command('login')
+  .description('Perform OAuth login to retrieve a token for fetching remote folders.json')
+  .option('--auth-url <url>', 'The OAuth authorization URL')
+  .option('--token-url <url>', 'The OAuth token exchange URL')
+  .option('--client-id <id>', 'The OAuth client ID')
+  .option('-p, --port <port>', 'Local port to listen for the callback (default: 3000)', '3000')
+  .action(async (options) => {
+    const debug = program.opts().debug || false;
+    const authUrl = options.authUrl || process.env.RDSS_AUTH_URL;
+    const tokenUrl = options.tokenUrl || process.env.RDSS_TOKEN_URL;
+    const clientId = options.clientId || process.env.RDSS_CLIENT_ID;
+    const port = parseInt(options.port, 10);
+
+    const token = await performLogin({ authUrl, tokenUrl, clientId, port, debug });
+    if (token) {
+      if (debug) signale.debug('Login completed successfully.');
+      process.exit(0);
+    } else {
+      process.exit(1);
+    }
   });
 
 program.parse(process.argv);
