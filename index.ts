@@ -816,12 +816,13 @@ export interface LoginOptions {
   clientId: string;
   port: number;
   debug: boolean;
+  force?: boolean;
 }
 
 export const performLogin = async (options: LoginOptions): Promise<string | undefined> => {
-  const { authUrl, tokenUrl, clientId, port, debug } = options;
+  const { authUrl, tokenUrl, clientId, port, debug, force } = options;
 
-  if (!isWindows()) {
+  if (!isWindows() && !force) {
     const existingToken = getTokenFromKeychain(debug);
     if (existingToken) {
       try {
@@ -857,7 +858,7 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
     process.exit(1);
   }
 
-  const redirectUri = `http://localhost:${port}/callback`;
+  const redirectUri = `http://localhost:${port}`;
   const fullAuthUrl = `${authUrl}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
 
   return new Promise((resolve) => {
@@ -865,7 +866,7 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
       async (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
         try {
           const parsedUrl = new URL(req.url, `http://localhost:${port}`);
-          if (parsedUrl.pathname === '/callback') {
+          if (parsedUrl.pathname === '/') {
             const code = parsedUrl.searchParams.get('code');
             if (code) {
               res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -945,16 +946,30 @@ program
   .option('--token-url <url>', 'The OAuth token exchange URL')
   .option('--client-id <id>', 'The OAuth client ID')
   .option('-p, --port <port>', 'Local port to listen for the callback (default: 3000)', '3000')
+  .option('-f, --force', 'Ignore existing token in keychain and force a new login')
   .action(async (options) => {
     const debug = program.opts().debug || false;
     const authUrl = options.authUrl || process.env.RDSS_AUTH_URL;
     const tokenUrl = options.tokenUrl || process.env.RDSS_TOKEN_URL;
     const clientId = options.clientId || process.env.RDSS_CLIENT_ID;
     const port = parseInt(options.port, 10);
+    const force = options.force || false;
 
-    const token = await performLogin({ authUrl, tokenUrl, clientId, port, debug });
+    const token = await performLogin({ authUrl, tokenUrl, clientId, port, debug, force });
     if (token) {
-      if (debug) signale.debug('Login completed successfully.');
+      if (debug) {
+        signale.debug('Login completed successfully.');
+        try {
+          const payloadBase64 = token.split('.')[1];
+          if (payloadBase64) {
+            const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
+            const payload = JSON.parse(payloadJson);
+            signale.debug('Access Token Payload:', payload);
+          }
+        } catch {
+          signale.debug('Failed to decode access token.');
+        }
+      }
       process.exit(0);
     } else {
       process.exit(1);
