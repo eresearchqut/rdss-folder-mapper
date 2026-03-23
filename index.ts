@@ -55,7 +55,57 @@ interface DriveMapping {
   id: string;
   title?: string;
   nickname?: string;
+  role?: string;
+  organisation?: string[];
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const transformPlansToFolders = (plans: any[]): { folders: DriveMapping[] } => {
+  const folders = plans
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((plan: any) => !!plan.dataStorageId)
+    .filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (plan: any) =>
+        plan.projectMeta?.isLead === true ||
+        plan.projectMeta?.isSupervisor === true ||
+        plan.projectMeta?.editable === true,
+    )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((plan: any) => {
+      const folder: DriveMapping = {
+        id: plan.encodedId,
+        title: plan.project?.title,
+      };
+
+      if (plan.projectMeta) {
+        if (plan.projectMeta.isLead) {
+          folder.role = 'LEAD';
+        } else if (plan.projectMeta.isSupervisor) {
+          folder.role = 'SUPERVISOR';
+        } else if (plan.projectMeta.isCollaborator) {
+          folder.role = 'COLLABORATOR';
+        }
+      }
+
+      if (plan.project?.organisation) {
+        const orgs = [];
+        if (plan.project.organisation.faculty?.name) {
+          orgs.push(plan.project.organisation.faculty.name);
+        }
+        if (plan.project.organisation.school?.name) {
+          orgs.push(plan.project.organisation.school.name);
+        }
+        if (orgs.length > 0) {
+          folder.organisation = orgs;
+        }
+      }
+
+      return folder;
+    });
+
+  return { folders };
+};
 
 const getMacCredentials = (debug: boolean) => {
   try {
@@ -781,10 +831,11 @@ program
 
     const debug = program.opts().debug || false;
 
+    const currentUser = os.userInfo().username;
     const usernameInput = readlineSync.question(
-      'Enter username (leave blank to use current user): ',
+      `Enter username (leave blank to use current user - ${currentUser}): `,
     );
-    const username = usernameInput.trim() || os.userInfo().username;
+    const username = usernameInput.trim() || currentUser;
 
     const password = readlineSync.question('Enter password: ', {
       hideEchoBack: true,
@@ -976,4 +1027,6 @@ program
     }
   });
 
-program.parse(process.argv);
+if (require.main === module) {
+  program.parse(process.argv);
+}
