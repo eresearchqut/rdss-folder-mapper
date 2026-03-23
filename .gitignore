@@ -3,6 +3,7 @@
 .test
 dist
 node_modules
-folders.json
+folders.local.json
 config.json
 plans.json
+.env

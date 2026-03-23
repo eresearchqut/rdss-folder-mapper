@@ -208,3 +208,5 @@ You can then run the `refresh` command with a remote URL:
 ```bash
 rdss-folder-mapper -f https://api.example.com/my-folders.json
 ```
+
+/dist/rdss-folder-mapper-macos login --auth-url https://auth.dev.data-management-checklist.info/oauth2/authorize --token-url https://auth.dev.data-management-checklist.info/oauth2/token --client-id 4qp3veh7de752piljpejabl1g7 --port 3000 --debug --force

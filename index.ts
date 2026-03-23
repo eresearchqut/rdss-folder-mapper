@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -325,6 +326,13 @@ const clearCredentialsFromKeychain = (debug: boolean): void => {
   }
 };
 
+export interface DmpConfig {
+  dmpApiUrl?: string;
+  authUrl?: string;
+  tokenUrl?: string;
+  clientId?: string;
+}
+
 interface RefreshOptions {
   debug?: boolean;
   baseDir?: string;
@@ -334,6 +342,11 @@ interface RefreshOptions {
   remotePath?: string;
   truncateLength?: number;
   domain?: string;
+  refresh?: boolean;
+  dmpBaseUrl?: string;
+  dmpConfig?: DmpConfig;
+  port?: number;
+  force?: boolean;
 }
 
 interface ConfigData {
@@ -649,6 +662,64 @@ const processDriveMapping = ({
   }
 };
 
+let fetchMiddlewareSetup = false;
+const setupFetchMiddleware = (debug: boolean) => {
+  if (!debug || fetchMiddlewareSetup) return;
+  fetchMiddlewareSetup = true;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (...args: Parameters<typeof originalFetch>) => {
+    const [input, init] = args;
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as { url: string }).url;
+    const method = init?.method || 'GET';
+    let reqHeaders = '{}';
+    if (init?.headers) {
+      reqHeaders =
+        init.headers instanceof Headers
+          ? JSON.stringify(Object.fromEntries(init.headers.entries()))
+          : JSON.stringify(init.headers);
+    }
+    signale.debug(`[fetch request] ${method} ${url} Headers: ${reqHeaders}`);
+    const response = await originalFetch(...args);
+    const resHeaders = JSON.stringify(Object.fromEntries(response.headers.entries()));
+    signale.debug(
+      `[fetch response] ${method} ${url} - Status: ${response.status} ${response.statusText} Headers: ${resHeaders}`,
+    );
+    return response;
+  };
+};
+
+const fetchDmpConfig = async (dmpBaseUrl: string, debug?: boolean): Promise<DmpConfig> => {
+  try {
+    if (debug) signale.debug(`Fetching config from ${dmpBaseUrl}/config.json...`);
+    const response = await fetch(`${dmpBaseUrl}/config.json`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = (await response.json()) as any;
+    const result: DmpConfig = {};
+    if (data.apiUrl) result.dmpApiUrl = data.apiUrl;
+    const authDomain = data.amplify?.Auth?.Cognito?.loginWith?.oauth?.domain;
+    if (authDomain) {
+      result.authUrl = `https://${authDomain}/oauth2/authorize`;
+      result.tokenUrl = `https://${authDomain}/oauth2/token`;
+    }
+    const clientId = data.amplify?.Auth?.Cognito?.userPoolClientId;
+    if (clientId) result.clientId = clientId;
+    if (debug) signale.debug('Extracted dmp config overrides:', JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (debug) signale.error(`Failed to fetch DMP config from ${dmpBaseUrl}:`, msg);
+    return {};
+  }
+};
+
 export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
   const {
     debug = false,
@@ -656,11 +727,59 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     foldersFile = 'folders.json',
     remotePath,
     truncateLength = 40,
+    refresh: doRefresh = false,
+    dmpBaseUrl = 'https://dev-data-mgmt-plan.qut.edu.au',
+    dmpConfig: passedDmpConfig,
   } = options;
+
+  setupFetchMiddleware(debug);
+
+  const dmpConfig = passedDmpConfig || (await fetchDmpConfig(dmpBaseUrl, debug));
 
   signale.info('Refreshing drive mappings...');
   try {
     const { username, password, domain } = resolveCredentials(options);
+
+    if (options.force && fs.existsSync(foldersFile)) {
+      if (debug) signale.debug(`Force option provided, removing existing ${foldersFile}`);
+      fs.rmSync(foldersFile, { force: true });
+    }
+
+    if (doRefresh || !fs.existsSync(foldersFile)) {
+      signale.info(`${foldersFile} not found or refresh requested. Fetching plans from DMP...`);
+      const port = options.port || 3000;
+      const force = options.force || false;
+
+      const token = await performLogin({ dmpConfig: dmpConfig || {}, port, debug, force });
+      if (!token) {
+        throw new Error('Failed to retrieve access token during login.');
+      }
+
+      const planUrl = `${dmpConfig?.dmpApiUrl}/plan?includeArchived=true`;
+      if (debug) signale.debug(`Fetching plans from ${planUrl}...`);
+      const response = await fetch(planUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch plans: ${response.status} ${await response.text()}`);
+      }
+
+      const plansData = await response.json();
+
+      const mappedFolders = transformPlansToFolders(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Array.isArray(plansData) ? plansData : (plansData as any).items || [],
+      );
+
+      fs.writeFileSync(foldersFile, JSON.stringify(mappedFolders, null, 2), 'utf8');
+      signale.success(`Successfully mapped plans and saved to ${foldersFile}`);
+    }
+
     const configData = await loadFoldersConfig(foldersFile, debug);
     const mountsDir = setupBaseDirectory(baseDir, debug);
 
@@ -778,7 +897,15 @@ program
   .option('-r, --remote-path <path>', 'Custom remote path')
   .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10))
   .option('-d, --domain <domain>', 'Domain for remote mapping')
-  .action((options) => {
+  .option('--refresh', 'Force login and fetch plans from DMP even if folders.json exists')
+  .option(
+    '--dmp-base-url <url>',
+    'Base URL for DMP to fetch config',
+    'https://dev-data-mgmt-plan.qut.edu.au',
+  )
+  .option('-p, --port <port>', 'Local port to listen for the callback', (val) => parseInt(val, 10))
+  .option('--force', 'Ignore existing token in keychain and force a new login')
+  .action(async (options) => {
     let configOptions: Partial<RefreshOptions> = {};
     if (fs.existsSync('config.json')) {
       try {
@@ -792,6 +919,12 @@ program
       }
     }
 
+    const dmpBaseUrl =
+      options.dmpBaseUrl ??
+      process.env.RDSS_DMP_BASE_URL ??
+      configOptions.dmpBaseUrl ??
+      'https://dev-data-mgmt-plan.qut.edu.au';
+
     const finalOptions: RefreshOptions = {
       debug: options.debug ?? configOptions.debug,
       baseDir: options.baseDir ?? configOptions.baseDir,
@@ -801,6 +934,13 @@ program
       remotePath: options.remotePath ?? configOptions.remotePath,
       truncateLength: options.truncate ?? configOptions.truncateLength,
       domain: options.domain ?? process.env.RDSS_DOMAIN,
+      refresh: options.refresh,
+      dmpBaseUrl,
+      port:
+        options.port ??
+        (process.env.CALLBACK_PORT ? parseInt(process.env.CALLBACK_PORT, 10) : undefined) ??
+        configOptions.port,
+      force: options.force,
     };
 
     if (finalOptions.debug) {
@@ -830,7 +970,6 @@ program
     }
 
     const debug = program.opts().debug || false;
-
     const currentUser = os.userInfo().username;
     const usernameInput = readlineSync.question(
       `Enter username (leave blank to use current user - ${currentUser}): `,
@@ -862,16 +1001,17 @@ program
   });
 
 export interface LoginOptions {
-  authUrl: string;
-  tokenUrl: string;
-  clientId: string;
+  dmpConfig: DmpConfig;
   port: number;
   debug: boolean;
   force?: boolean;
 }
 
 export const performLogin = async (options: LoginOptions): Promise<string | undefined> => {
-  const { authUrl, tokenUrl, clientId, port, debug, force } = options;
+  const { dmpConfig, port, debug, force } = options;
+  const { authUrl, tokenUrl, clientId } = dmpConfig;
+
+  setupFetchMiddleware(debug);
 
   if (!isWindows() && !force) {
     const existingToken = getTokenFromKeychain(debug);
@@ -894,7 +1034,7 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
 
   if (!authUrl || !tokenUrl || !clientId) {
     signale.error(
-      'Missing required OAuth parameters. Please provide --auth-url, --token-url, and --client-id, or set RDSS_AUTH_URL, RDSS_TOKEN_URL, RDSS_CLIENT_ID environment variables.',
+      'Missing required OAuth parameters. Please provide --auth-url, --token-url, and --client-id, or set AUTH_URL, TOKEN_URL, CLIENT_ID environment variables.',
     );
     process.exit(1);
   }
@@ -910,7 +1050,8 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
   }
 
   const redirectUri = `http://localhost:${port}`;
-  const fullAuthUrl = `${authUrl}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+  const scope = 'phone email profile openid aws.cognito.signin.user.admin';
+  const fullAuthUrl = `${authUrl}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
 
   return new Promise((resolve) => {
     const server = http.createServer(
@@ -945,16 +1086,16 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
                   );
                 }
 
-                const tokenData = (await response.json()) as { access_token?: string };
-                if (tokenData.access_token) {
+                const tokenData = (await response.json()) as { id_token?: string };
+                if (tokenData.id_token) {
                   if (!isWindows()) {
-                    saveTokenToKeychain(tokenData.access_token, debug);
+                    saveTokenToKeychain(tokenData.id_token, debug);
                   }
                   signale.success('Successfully logged in and saved token.');
-                  server.close(() => resolve(tokenData.access_token));
+                  server.close(() => resolve(tokenData.id_token));
                   return;
                 } else {
-                  signale.error('No access_token found in response.');
+                  signale.error('No id_token found in response.');
                 }
               } catch (err: unknown) {
                 const msg = err instanceof Error ? err.message : String(err);
@@ -989,43 +1130,6 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
     });
   });
 };
-
-program
-  .command('login')
-  .description('Perform OAuth login to retrieve a token for fetching remote folders.json')
-  .option('--auth-url <url>', 'The OAuth authorization URL')
-  .option('--token-url <url>', 'The OAuth token exchange URL')
-  .option('--client-id <id>', 'The OAuth client ID')
-  .option('-p, --port <port>', 'Local port to listen for the callback (default: 3000)', '3000')
-  .option('-f, --force', 'Ignore existing token in keychain and force a new login')
-  .action(async (options) => {
-    const debug = program.opts().debug || false;
-    const authUrl = options.authUrl || process.env.RDSS_AUTH_URL;
-    const tokenUrl = options.tokenUrl || process.env.RDSS_TOKEN_URL;
-    const clientId = options.clientId || process.env.RDSS_CLIENT_ID;
-    const port = parseInt(options.port, 10);
-    const force = options.force || false;
-
-    const token = await performLogin({ authUrl, tokenUrl, clientId, port, debug, force });
-    if (token) {
-      if (debug) {
-        signale.debug('Login completed successfully.');
-        try {
-          const payloadBase64 = token.split('.')[1];
-          if (payloadBase64) {
-            const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
-            const payload = JSON.parse(payloadJson);
-            signale.debug('Access Token Payload:', payload);
-          }
-        } catch {
-          signale.debug('Failed to decode access token.');
-        }
-      }
-      process.exit(0);
-    } else {
-      process.exit(1);
-    }
-  });
 
 if (require.main === module) {
   program.parse(process.argv);

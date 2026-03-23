@@ -498,9 +498,11 @@ describe('Integration Test', () => {
       const { performLogin } = require('./index');
 
       const token = await performLogin({
-        authUrl: 'http://auth',
-        tokenUrl: 'http://token',
-        clientId: 'client',
+        dmpConfig: {
+          authUrl: 'http://auth',
+          tokenUrl: 'http://token',
+          clientId: 'client',
+        },
         port: 3001,
         debug: true,
       });
@@ -523,15 +525,17 @@ describe('Integration Test', () => {
 
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ access_token: 'windows_token' }),
+        json: async () => ({ id_token: 'windows_token' }),
       });
 
       // Start login, it should complain about missing params or try to open browser
       // Actually, let's provide dummy URLs and see if it tries to open
       const loginPromise = performLogin({
-        authUrl: 'http://auth',
-        tokenUrl: 'http://token',
-        clientId: 'client',
+        dmpConfig: {
+          authUrl: 'http://auth',
+          tokenUrl: 'http://token',
+          clientId: 'client',
+        },
         port: 3002,
         debug: true,
       });
@@ -570,15 +574,17 @@ describe('Integration Test', () => {
       // Mock fetch for the token exchange
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ access_token: 'new_valid_token' }),
+        json: async () => ({ id_token: 'new_valid_token' }),
       });
 
       const { performLogin } = require('./index');
 
       const loginPromise = performLogin({
-        authUrl: 'http://auth',
-        tokenUrl: 'http://token',
-        clientId: 'client',
+        dmpConfig: {
+          authUrl: 'http://auth',
+          tokenUrl: 'http://token',
+          clientId: 'client',
+        },
         port: 3003,
         debug: true,
       });
@@ -606,15 +612,17 @@ describe('Integration Test', () => {
 
       fetchMock.mockResolvedValue({
         ok: true,
-        json: async () => ({ access_token: 'new_valid_token_2' }),
+        json: async () => ({ id_token: 'new_valid_token_2' }),
       });
 
       const { performLogin } = require('./index');
 
       const loginPromise = performLogin({
-        authUrl: 'http://auth',
-        tokenUrl: 'http://token',
-        clientId: 'client',
+        dmpConfig: {
+          authUrl: 'http://auth',
+          tokenUrl: 'http://token',
+          clientId: 'client',
+        },
         port: 3004,
         debug: true,
       });
