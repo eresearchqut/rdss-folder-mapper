@@ -2,7 +2,13 @@ import { execSync, execFileSync } from 'child_process';
 import signale from 'signale';
 import { OsInfo } from './os';
 
-export const getMacCredentials = (debug: boolean) => {
+export interface Credentials {
+  username?: string;
+  password?: string;
+  domain?: string;
+}
+
+export const getMacCredentials = (debug: boolean): Credentials => {
   try {
     if (debug) signale.debug('Attempting to read credentials from macOS keychain...');
     const stdout = execSync('security find-generic-password -s "rdss-folder-mapper"', {
@@ -34,7 +40,7 @@ export const getMacCredentials = (debug: boolean) => {
   return {};
 };
 
-export const getLinuxCredentials = (debug: boolean) => {
+export const getLinuxCredentials = (debug: boolean): Credentials => {
   try {
     if (debug) signale.debug('Attempting to read credentials from Linux secret-tool...');
     const searchOutput = execSync('secret-tool search --all service rdss-folder-mapper', {
@@ -67,11 +73,7 @@ export const getLinuxCredentials = (debug: boolean) => {
 export const getCredentialsFromKeychain = (
   debug: boolean,
   osInfo: OsInfo,
-): {
-  username?: string;
-  password?: string;
-  domain?: string;
-} => {
+): Credentials => {
   if (osInfo.isMac) {
     return getMacCredentials(debug);
   } else if (!osInfo.isWindows) {
@@ -81,7 +83,7 @@ export const getCredentialsFromKeychain = (
 };
 
 export const saveMacCredentials = (
-  creds: { username?: string; password?: string; domain?: string },
+  creds: Credentials,
   debug: boolean,
 ): void => {
   try {
@@ -102,7 +104,7 @@ export const saveMacCredentials = (
 };
 
 export const saveLinuxCredentials = (
-  creds: { username?: string; password?: string; domain?: string },
+  creds: Credentials,
   debug: boolean,
 ): void => {
   try {
@@ -120,7 +122,7 @@ export const saveLinuxCredentials = (
 };
 
 export const saveCredentialsToKeychain = (
-  creds: { username?: string; password?: string; domain?: string },
+  creds: Credentials,
   debug: boolean,
   osInfo: OsInfo,
 ): void => {

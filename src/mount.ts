@@ -8,6 +8,7 @@ import signale from 'signale';
 
 import { FolderMapping } from './mapper';
 import { OS, OsInfo } from './os';
+import { Credentials } from './secrets';
 
 
 // eslint-disable-next-line no-control-regex
@@ -162,14 +163,13 @@ export interface MountOptions {
   os: OS;
   localPath: string;
   mountPath: string;
-  username?: string;
-  password?: string;
-  domain?: string;
+  credentials?: Credentials;
   debug?: boolean;
 }
 
 export const mountWindows = (options: MountOptions) => {
-  const { remotePath, localPath, username, password, domain, debug = false } = options;
+  const { remotePath, localPath, credentials, debug = false } = options;
+  const { username, password, domain } = credentials || {};
   const existingIsFolder = isExistingFolder(localPath);
   if (existingIsFolder) {
     try {
@@ -190,7 +190,8 @@ export const mountWindows = (options: MountOptions) => {
 }
 
 export const mountMac = (options: MountOptions) => {
-  const { remotePath, localPath, mountPath, username, password, domain, debug = false } = options;
+  const { remotePath, localPath, mountPath, credentials, debug = false } = options;
+  const { username, password, domain } = credentials || {};
   let macRemote = remotePath;
   let macRemoteLog = remotePath;
   if (username && password && macRemote.startsWith('smb://')) {
@@ -214,7 +215,8 @@ export const mountMac = (options: MountOptions) => {
 };
 
 export const mountLinux = (options: MountOptions) => {
-  const { remotePath, localPath, mountPath, username, password, domain, debug = false } = options;
+  const { remotePath, localPath, mountPath, credentials, debug = false } = options;
+  const { username, password, domain } = credentials || {};
   let linuxRemote = remotePath;
   if (linuxRemote.startsWith('smb://')) {
     linuxRemote = linuxRemote.replace('smb://', '//');
@@ -248,9 +250,7 @@ export const processFolderMapping = ({
   mountsDir,
   remotePath,
   truncateLength,
-  username,
-  password,
-  domain,
+  credentials,
   debug = false,
   osInfo,
 }: FolderMappingOptions) => {
@@ -267,9 +267,7 @@ export const processFolderMapping = ({
     os: osType,
     localPath,
     mountPath,
-    username,
-    password,
-    domain,
+    credentials,
     debug,
   };
 
@@ -301,7 +299,7 @@ export const processFolderMapping = ({
       signale.debug(`Successfully mounted ${remote} to ${localPath}`);
     }
   } catch (error: unknown) {
-    handleMountError(error, remote, localPath, mountPath, password, debug, osInfo);
+    handleMountError(error, remote, localPath, mountPath, credentials?.password, debug, osInfo);
   }
 };
 

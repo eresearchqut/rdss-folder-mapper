@@ -70,6 +70,34 @@ describe('Mount Integration Test', () => {
 
   describe('CLI mounting', () => {
     const testRdssDir = path.join(process.cwd(), '.test', 'RDSS');
+    const mockBinDir = path.join(process.cwd(), '.test', 'bin');
+
+    beforeAll(() => {
+      fs.mkdirSync(mockBinDir, { recursive: true });
+      const mockScript = `#!/bin/bash
+if [[ "$1" == "find-generic-password" ]]; then
+  if [[ "$*" == *"-w"* ]]; then
+    echo "testpass"
+  else
+    echo '"acct"<blob>="testuser"'
+    echo '"gena"<blob>="testdomain"'
+  fi
+  exit 0
+fi
+if [[ "$1" == "search" ]]; then
+  echo "username = testuser"
+  echo "domain = testdomain"
+  exit 0
+fi
+if [[ "$1" == "lookup" ]]; then
+  echo "testpass"
+  exit 0
+fi
+exit 0
+`;
+      fs.writeFileSync(path.join(mockBinDir, 'security'), mockScript, { mode: 0o755 });
+      fs.writeFileSync(path.join(mockBinDir, 'secret-tool'), mockScript, { mode: 0o755 });
+    });
 
     beforeEach(() => {
       if (fs.existsSync(testRdssDir)) {
@@ -108,8 +136,7 @@ describe('Mount Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        RDSS_USERNAME: 'testuser',
-        RDSS_PASSWORD: 'testpass',
+        PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
       execSync(`npx ts-node src/index.ts --base-dir ${testRdssDir}`, { env, stdio: 'pipe' });
@@ -136,8 +163,7 @@ describe('Mount Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        RDSS_USERNAME: 'testuser',
-        RDSS_PASSWORD: 'testpass',
+        PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
       try {
@@ -175,8 +201,7 @@ describe('Mount Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        RDSS_USERNAME: 'testuser',
-        RDSS_PASSWORD: 'testpass',
+        PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
       try {
@@ -227,8 +252,7 @@ describe('Mount Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        RDSS_USERNAME: 'testuser',
-        RDSS_PASSWORD: 'testpass',
+        PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
       execSync(
@@ -336,8 +360,7 @@ describe('Mount Integration Test', () => {
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        RDSS_USERNAME: 'testuser',
-        RDSS_PASSWORD: 'testpass',
+        PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
       execSync(

@@ -15,6 +15,7 @@ import {
   getCredentialsFromKeychain,
   saveCredentialsToKeychain,
   clearCredentialsFromKeychain,
+  Credentials,
 } from './secrets';
 import { getOs, OsInfo } from './os';
 import { setupFetchMiddleware, performLogin } from './auth';
@@ -32,15 +33,11 @@ export const BASE_DIR = path.join(os.homedir(), 'RDSS');
 interface RefreshOptions {
   debug?: boolean;
   baseDir?: string;
-  username?: string;
-  password?: string;
   foldersFile?: string;
   remotePath?: string;
   truncateLength?: number;
-  domain?: string;
   refresh?: boolean;
   dmpBaseUrl?: string;
-  dmpConfig?: DmpConfig;
   port?: number;
   force?: boolean;
 }
@@ -48,18 +45,10 @@ interface RefreshOptions {
 const resolveCredentials = (
   options: RefreshOptions,
   osInfo: OsInfo,
-): {
-  username?: string;
-  password?: string;
-  domain: string;
-} => {
-  let { username, password, domain } = options;
-  if (!username || !password || !domain) {
-    const keychainCreds = getCredentialsFromKeychain(options.debug || false, osInfo);
-    username = username || keychainCreds.username;
-    password = password || keychainCreds.password;
-    domain = domain || keychainCreds.domain;
-  }
+): Credentials => {
+  const keychainCreds = getCredentialsFromKeychain(options.debug || false, osInfo);
+  let { username, password, domain } = keychainCreds;
+
   domain = domain || 'qutad';
   if (!username && password) {
     username = os.userInfo().username;
@@ -80,16 +69,14 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     truncateLength = 40,
     refresh: doRefresh = false,
     dmpBaseUrl = 'https://dev-data-mgmt-plan.qut.edu.au',
-    dmpConfig: passedDmpConfig,
   } = options;
 
   setupFetchMiddleware(debug);
 
-  const dmpConfig = passedDmpConfig || (await fetchDmpConfig(dmpBaseUrl, debug));
-
   signale.info('Refreshing drive mappings...');
+  let credentials: Credentials | undefined;
   try {
-    const { username, password, domain } = resolveCredentials(options, osInfo);
+    credentials = resolveCredentials(options, osInfo);
 
     if (options.force && fs.existsSync(foldersFile)) {
       if (debug) signale.debug(`Force option provided, removing existing ${foldersFile}`);
@@ -100,6 +87,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       signale.info(`${foldersFile} not found or refresh requested. Fetching plans from DMP...`);
       const port = options.port || 3000;
       const force = options.force || false;
+      const dmpConfig = await fetchDmpConfig(dmpBaseUrl, debug);
 
       const token = await performLogin({ dmpConfig: dmpConfig || {}, port, debug, force }, osInfo);
       if (!token) {
@@ -136,18 +124,16 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
 
     const baseRemotePath = remotePath || (osInfo.isWindows ? REMOTE_PATH_WIN : REMOTE_PATH_NIX);
 
-    for (const drive of folders) {
-      const folderRemotePath = `${baseRemotePath}${osInfo.isWindows ? '\\' : '/'}${drive.id}`;
+    for (const folder of folders) {
+      const folderRemotePath = `${baseRemotePath}${osInfo.isWindows ? '\\' : '/'}${folder.id}`;
 
       processFolderMapping({
-        folderMapping: drive,
+        folderMapping: folder,
         baseDir,
         mountsDir,
         remotePath: folderRemotePath,
         truncateLength,
-        username,
-        password,
-        domain,
+        credentials,
         debug,
         osInfo,
       });
@@ -155,7 +141,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     signale.success('Refresh complete.');
   } catch (error: unknown) {
     process.exitCode = 1;
-    const msg = sanitizeErrorMessage(error, options.password);
+    const msg = sanitizeErrorMessage(error, credentials?.password);
     signale.error('Error during refresh:', msg);
   }
 };
@@ -173,7 +159,6 @@ program
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('-r, --remote-path <path>', 'Custom remote path')
   .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10))
-  .option('-d, --domain <domain>', 'Domain for remote mapping')
   .option('--refresh', 'Force login and fetch plans from DMP even if folders.json exists')
   .option(
     '--dmp-base-url <url>',
@@ -205,12 +190,9 @@ program
     const finalOptions: RefreshOptions = {
       debug: options.debug ?? configOptions.debug,
       baseDir: options.baseDir ?? configOptions.baseDir,
-      username: process.env.RDSS_USERNAME,
-      password: process.env.RDSS_PASSWORD,
       foldersFile: options.folders ?? configOptions.foldersFile,
       remotePath: options.remotePath ?? configOptions.remotePath,
       truncateLength: options.truncate ?? configOptions.truncateLength,
-      domain: options.domain ?? process.env.RDSS_DOMAIN,
       refresh: options.refresh,
       dmpBaseUrl,
       port:
@@ -222,7 +204,6 @@ program
 
     if (finalOptions.debug) {
       const logOptions = { ...finalOptions };
-      if (logOptions.password) logOptions.password = '***';
       signale.debug('Using options:', JSON.stringify(logOptions, null, 2));
     }
 
