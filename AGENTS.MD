@@ -14,3 +14,5 @@
 2. **Type Safety:** Ensure all new properties on interfaces (like `DriveMapping`) are correctly typed and handle optional values gracefully.
 3. **CLI Execution:** Keep CLI execution wrapped in `if (require.main === module)` to prevent unintended execution during test runs.
 4. **Formatting/Linting:** Adhere to existing ESLint configurations (`eslint.config.js`).
+5. **Functional Programming:** Use functional programming to avoid side effects.
+

@@ -20,7 +20,10 @@ customConfig.push({
       ...globals.node,
       ...globals.jest,
     },
+    parserOptions: {
+      project: ['./tsconfig.json', './tsconfig.test.json'],
+    },
   },
 });
 
-module.exports = [...customConfig, ...require('gts')];
+module.exports = [...require('gts'), ...customConfig];
