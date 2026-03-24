@@ -97,9 +97,35 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
             const code = parsedUrl.searchParams.get('code');
             if (code) {
               res.writeHead(200, { 'Content-Type': 'text/html' });
-              res.end(
-                '<html><body><h2>Authentication successful!</h2><p>You can close this window and return to your terminal.</p></body></html>',
-              );
+              res.end(`<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f0f2f5; color: #333; }
+    .container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
+    h2 { color: #4CAF50; margin-top: 0; }
+    .timer { font-size: 24px; font-weight: bold; color: #555; margin: 0 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>DMP Authentication Successful!</h2>
+    <p>You can now return to your terminal.</p>
+    <p>This window will close automatically in <span id="time" class="timer">10</span> seconds.</p>
+  </div>
+  <script>
+    let timeLeft = 5;
+    const timerEl = document.getElementById('time');
+    const interval = setInterval(() => {
+      timeLeft--;
+      timerEl.textContent = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        window.close();
+      }
+    }, 1000);
+  </script>
+</body>
+</html>`);
 
               if (debug) signale.debug('Authorization code received, exchanging for token...');
 
