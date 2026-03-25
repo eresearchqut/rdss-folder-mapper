@@ -59,11 +59,12 @@ describe('auth performLogin', () => {
 
     const token = await performLogin({
       dmpConfig: {
-        authUrl: 'http://auth',
-        tokenUrl: 'http://token',
+        apiUrl: 'http://api',
+        domain: 'auth',
         clientId: 'client',
+        callbackUrls: ['http://localhost:3001/'],
+        scopes: [],
       },
-      port: 3001,
       debug: true,
     }, getOs());
 
@@ -95,11 +96,11 @@ describe('auth performLogin', () => {
     // Actually, let's provide dummy URLs and see if it tries to open
     const loginPromise = performLogin({
       dmpConfig: {
-        authUrl: 'http://auth',
-        tokenUrl: 'http://token',
+        apiUrl: 'http://api',
+        domain: 'auth',
         clientId: 'client',
+        callbackUrls: ['http://localhost:3002/'],
       },
-      port: 3002,
       debug: true,
     }, getOs());
 
@@ -146,11 +147,11 @@ describe('auth performLogin', () => {
 
     const loginPromise = performLogin({
       dmpConfig: {
-        authUrl: 'http://auth',
-        tokenUrl: 'http://token',
+        apiUrl: 'http://api',
+        domain: 'auth',
         clientId: 'client',
+        callbackUrls: ['http://localhost:3003/'],
       },
-      port: 3003,
       debug: true,
     }, getOs());
 
@@ -186,11 +187,11 @@ describe('auth performLogin', () => {
 
     const loginPromise = performLogin({
       dmpConfig: {
-        authUrl: 'http://auth',
-        tokenUrl: 'http://token',
+        apiUrl: 'http://api',
+        domain: 'auth',
         clientId: 'client',
+        callbackUrls: ['http://localhost:3004/'],
       },
-      port: 3004,
       debug: true,
     }, getOs());
 

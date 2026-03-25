@@ -38,7 +38,6 @@ interface RefreshOptions {
   truncateLength?: number;
   refresh?: boolean;
   dmpBaseUrl?: string;
-  port?: number;
   force?: boolean;
 }
 
@@ -85,16 +84,15 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
 
     if (doRefresh || !fs.existsSync(foldersFile)) {
       signale.info(`${foldersFile} not found or refresh requested. Fetching plans from DMP...`);
-      const port = options.port || 3000;
       const force = options.force || false;
       const dmpConfig = await fetchDmpConfig(dmpBaseUrl, debug);
 
-      const token = await performLogin({ dmpConfig: dmpConfig || {}, port, debug, force }, osInfo);
+      const token = await performLogin({ dmpConfig: dmpConfig || {}, debug, force }, osInfo);
       if (!token) {
         throw new Error('Failed to retrieve access token during login.');
       }
 
-      const planUrl = `${dmpConfig?.dmpApiUrl}/plan?includeArchived=true`;
+      const planUrl = `${dmpConfig?.apiUrl}/plan?includeArchived=true`;
       if (debug) signale.debug(`Fetching plans from ${planUrl}...`);
       const response = await fetch(planUrl, {
         headers: {
@@ -165,7 +163,6 @@ program
     'Base URL for DMP to fetch config',
     'https://dev-data-mgmt-plan.qut.edu.au',
   )
-  .option('-p, --port <port>', 'Local port to listen for the callback', (val) => parseInt(val, 10))
   .option('--force', 'Ignore existing token in keychain and force a new login')
   .action(async (options) => {
     let configOptions: Partial<RefreshOptions> = {};
@@ -195,10 +192,6 @@ program
       truncateLength: options.truncate ?? configOptions.truncateLength,
       refresh: options.refresh,
       dmpBaseUrl,
-      port:
-        options.port ??
-        (process.env.CALLBACK_PORT ? parseInt(process.env.CALLBACK_PORT, 10) : undefined) ??
-        configOptions.port,
       force: options.force,
     };
 

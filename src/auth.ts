@@ -5,7 +5,6 @@ import { DmpConfig } from './config';
 
 export interface LoginOptions {
   dmpConfig: DmpConfig;
-  port: number;
   debug: boolean;
   force?: boolean;
 }
@@ -42,8 +41,10 @@ export const setupFetchMiddleware = (debug: boolean) => {
 };
 
 export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promise<string | undefined> => {
-  const { dmpConfig, port, debug, force } = options;
-  const { authUrl, tokenUrl, clientId } = dmpConfig;
+  const { dmpConfig, debug, force } = options;
+  const { clientId, domain } = dmpConfig;
+  const authUrl = `https://${domain}/oauth2/authorize`;
+  const tokenUrl = `https://${domain}/oauth2/token`;
 
   setupFetchMiddleware(debug);
 
@@ -66,9 +67,9 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
     }
   }
 
-  if (!authUrl || !tokenUrl || !clientId) {
+  if (!domain || !clientId) {
     signale.error(
-      'Missing required OAuth parameters. Please provide --auth-url, --token-url, and --client-id, or set AUTH_URL, TOKEN_URL, CLIENT_ID environment variables.',
+      'Missing required OAuth parameters. Please ensure DMP config has a domain and client id.',
     );
     process.exit(1);
   }
@@ -84,7 +85,17 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
     process.exit(1);
   }
 
-  const redirectUri = `http://localhost:${port}`;
+  if (!dmpConfig.callbackUrls || dmpConfig.callbackUrls.length === 0) {
+    signale.error('No callbackUrls provided in DMP config.');
+    process.exit(1);
+  }
+
+  const redirectUriObj = new URL(dmpConfig.callbackUrls[Math.floor(Math.random() * dmpConfig.callbackUrls.length)]);
+
+  const redirectUri = redirectUriObj.toString();
+  const serverPort = redirectUriObj.port ? parseInt(redirectUriObj.port, 10) : 80;
+  const expectedPath = redirectUriObj.pathname || '/';
+
   const scope = 'phone email profile openid aws.cognito.signin.user.admin';
   const fullAuthUrl = `${authUrl}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
 
@@ -92,8 +103,8 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
     const server = http.createServer(
       async (req: import('http').IncomingMessage, res: import('http').ServerResponse) => {
         try {
-          const parsedUrl = new URL(req.url, `http://localhost:${port}`);
-          if (parsedUrl.pathname === '/') {
+          const parsedUrl = new URL(req.url, `http://localhost:${serverPort}`);
+          if (parsedUrl.pathname === expectedPath) {
             const code = parsedUrl.searchParams.get('code');
             if (code) {
               res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -110,7 +121,7 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
   <div class="container">
     <h2>DMP Authentication Successful!</h2>
     <p>You can now return to your terminal.</p>
-    <p>This window will close automatically in <span id="time" class="timer">10</span> seconds.</p>
+    <p>This window will close automatically in <span id="time" class="timer">5</span> seconds.</p>
   </div>
   <script>
     let timeLeft = 5;
@@ -180,7 +191,7 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
       },
     );
 
-    server.listen(port, async () => {
+    server.listen(serverPort, async () => {
       signale.info(`Listening on ${redirectUri}`);
       signale.info(`Opening browser to ${fullAuthUrl}`);
       try {

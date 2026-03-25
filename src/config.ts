@@ -5,37 +5,22 @@ import { getTokenFromKeychain } from './secrets';
 import { OsInfo } from './os';
 
 export interface DmpConfig {
-  dmpApiUrl?: string;
-  authUrl?: string;
-  tokenUrl?: string;
-  clientId?: string;
+  clientId: string;
+  apiUrl: string;
+  callbackUrls: string[];
+  domain: string;
+  scopes: string[];
 }
 
 export const fetchDmpConfig = async (dmpBaseUrl: string, debug?: boolean): Promise<DmpConfig> => {
-  try {
-    if (debug) signale.debug(`Fetching config from ${dmpBaseUrl}/config.json...`);
-    const response = await fetch(`${dmpBaseUrl}/config.json`);
+    if (debug) signale.debug(`Fetching config from ${dmpBaseUrl}/cli.json...`);
+    const response = await fetch(`${dmpBaseUrl}/cli.json`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = (await response.json()) as any;
-    const result: DmpConfig = {};
-    if (data.apiUrl) result.dmpApiUrl = data.apiUrl;
-    const authDomain = data.amplify?.Auth?.Cognito?.loginWith?.oauth?.domain;
-    if (authDomain) {
-      result.authUrl = `https://${authDomain}/oauth2/authorize`;
-      result.tokenUrl = `https://${authDomain}/oauth2/token`;
-    }
-    const clientId = data.amplify?.Auth?.Cognito?.userPoolClientId;
-    if (clientId) result.clientId = clientId;
-    if (debug) signale.debug('Extracted dmp config overrides:', JSON.stringify(result, null, 2));
-    return result;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (debug) signale.error(`Failed to fetch DMP config from ${dmpBaseUrl}:`, msg);
-    return {};
-  }
+    const cliConfig = (await response.json()) as DmpConfig;
+    if (debug) signale.debug('Cli config:', JSON.stringify(cliConfig, null, 2));
+    return cliConfig;
 };
 
 export const loadFoldersConfig = async (
