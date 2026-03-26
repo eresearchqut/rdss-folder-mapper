@@ -27,6 +27,7 @@ export { transformPlansToFolders, performLogin };
 
 export const REMOTE_PATH_WIN = process.env.REMOTE_PATH_WIN || '\\\\rstore.qut.edu.au\\Projects';
 export const REMOTE_PATH_NIX = process.env.REMOTE_PATH_NIX || 'smb://rstore.qut.edu.au/projects';
+export const DMP_BASE_URL = process.env.DMP_BASE_URL || 'https://qa-data-mgmt-plan.qut.edu.au'
 export const BASE_DIR = path.join(os.homedir(), 'RDSS');
 
 
@@ -67,7 +68,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     remotePath,
     truncateLength = 40,
     refresh: doRefresh = false,
-    dmpBaseUrl = 'https://dev-data-mgmt-plan.qut.edu.au',
+    dmpBaseUrl = DMP_BASE_URL,
   } = options;
 
   setupFetchMiddleware(debug);
@@ -161,8 +162,7 @@ program
   .option(
     '--dmp-base-url <url>',
     'Base URL for DMP to fetch config',
-    'https://dev-data-mgmt-plan.qut.edu.au',
-  )
+    DMP_BASE_URL)
   .option('--force', 'Ignore existing token in keychain and force a new login')
   .action(async (options) => {
     let configOptions: Partial<RefreshOptions> = {};
@@ -182,7 +182,7 @@ program
       options.dmpBaseUrl ??
       process.env.RDSS_DMP_BASE_URL ??
       configOptions.dmpBaseUrl ??
-      'https://dev-data-mgmt-plan.qut.edu.au';
+      'https://qa-data-mgmt-plan.qut.edu.au';
 
     const finalOptions: RefreshOptions = {
       debug: options.debug ?? configOptions.debug,
