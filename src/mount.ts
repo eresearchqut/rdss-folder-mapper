@@ -205,13 +205,13 @@ export const mountWindows = (options: MountOptions) => {
     execSync(cmd, { stdio: debug ? 'pipe' : 'ignore' });
   }
   try {
-    const mklinkCmd = `mklink /j "${localPath.replace(/\//g, '\\')}" "${remotePath.replace(/\//g, '\\')}"`;
-    if (debug) signale.debug(`Executing: ${mklinkCmd}`);
-    execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
-  } catch (error) {
-    if (debug) signale.debug(`mklink failed (likely insufficient permissions), falling back to Windows shortcut (.lnk)`);
     const psCmd = `$s=(New-Object -COM WScript.Shell).CreateShortcut('${localPath}.lnk');$s.TargetPath='${remotePath}';$s.Save()`;
+    if (debug) signale.debug(`Executing PowerShell to create shortcut: ${psCmd}`);
     execSync(`powershell -command "${psCmd}"`, { stdio: debug ? 'pipe' : 'ignore' });
+  } catch (error) {
+    if (debug) signale.debug(`PowerShell shortcut creation failed, falling back to mklink`);
+    const mklinkCmd = `mklink /j "${localPath.replace(/\//g, '\\')}" "${remotePath.replace(/\//g, '\\')}"`;
+    execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
   }
 }
 
