@@ -12,7 +12,7 @@ const TMP_DIR = path.join(__dirname, 'tmp');
 const TARGETS = [
   { os: 'linux', arch: 'x64', ext: '', name: 'linux' },
   { os: 'darwin', arch: 'x64', ext: '', name: 'macos' },
-  { os: 'win32', arch: 'x64', ext: '.exe', name: 'win' }
+  { os: 'win32', arch: 'x64', ext: '.exe', name: 'win' },
 ];
 
 async function downloadFile(url, dest) {
@@ -25,15 +25,15 @@ async function extractNode(target) {
   let nodeOs = target.os;
   if (target.os === 'win32') nodeOs = 'win';
   if (target.os === 'darwin') nodeOs = 'darwin';
-  
+
   const isZip = target.os === 'win32';
   const archiveExt = isZip ? '.zip' : '.tar.gz';
   const archiveName = `node-${NODE_VERSION}-${nodeOs}-${target.arch}`;
   const archiveUrl = `https://nodejs.org/dist/${NODE_VERSION}/${archiveName}${archiveExt}`;
-  
+
   const archivePath = path.join(TMP_DIR, `${archiveName}${archiveExt}`);
   const extractDir = path.join(TMP_DIR, archiveName);
-  
+
   await downloadFile(archiveUrl, archivePath);
 
   if (!fs.existsSync(extractDir)) {
@@ -44,13 +44,17 @@ async function extractNode(target) {
     } else {
       await tar.x({
         file: archivePath,
-        C: TMP_DIR
+        C: TMP_DIR,
       });
     }
   }
 
   const nodeBinaryExt = target.os === 'win32' ? '.exe' : '';
-  const nodeBinaryPath = path.join(extractDir, target.os === 'win32' ? '' : 'bin', `node${nodeBinaryExt}`);
+  const nodeBinaryPath = path.join(
+    extractDir,
+    target.os === 'win32' ? '' : 'bin',
+    `node${nodeBinaryExt}`,
+  );
   return nodeBinaryPath;
 }
 
@@ -72,20 +76,20 @@ async function build() {
   const seaConfig = {
     main: 'dist/index.bundle.js',
     output: 'dist/sea-prep.blob',
-    disableExperimentalSEAWarning: true
+    disableExperimentalSEAWarning: true,
   };
   fs.writeFileSync('sea-config.json', JSON.stringify(seaConfig, null, 2));
 
   console.log('Generating SEA blob...');
-  execSync(`node --experimental-sea-config sea-config.json`, { stdio: 'inherit' });
+  execSync('node --experimental-sea-config sea-config.json', { stdio: 'inherit' });
 
   for (const target of TARGETS) {
     console.log(`\n--- Building for ${target.os} ---`);
     const nodeBinaryPath = await extractNode(target);
-    
-    let execName = `rdss-folder-mapper-${target.name}${target.ext}`;
+
+    const execName = `rdss-folder-mapper-${target.name}${target.ext}`;
     const outPath = path.join(DIST_DIR, execName);
-    
+
     console.log(`Copying node executable to ${outPath}...`);
     fs.copyFileSync(nodeBinaryPath, outPath);
 
@@ -96,7 +100,9 @@ async function build() {
     if (target.os === 'darwin') {
       try {
         execSync(`codesign --remove-signature "${outPath}"`, { stdio: 'ignore' });
-      } catch (e) { }
+      } catch {
+        // ignore
+      }
     }
 
     console.log(`Injecting blob for ${target.os}...`);
@@ -108,7 +114,7 @@ async function build() {
       console.log('Re-signing executable for macOS...');
       try {
         execSync(`codesign --sign - "${outPath}"`, { stdio: 'inherit' });
-      } catch (e) {
+      } catch {
         console.warn('Failed to codesign on macOS. This may be fine if not on macOS.');
       }
     }
@@ -117,7 +123,7 @@ async function build() {
   }
 }
 
-build().catch(err => {
+build().catch((err) => {
   console.error(err);
   process.exit(1);
 });

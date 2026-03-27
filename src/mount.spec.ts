@@ -8,7 +8,10 @@ import {
   getIgnoredItems,
   sanitizeErrorMessage,
   setupBaseDirectory,
+  processFolderMapping,
+  removeMapping,
 } from './mount';
+import signale from 'signale';
 import { getOs } from './os';
 
 jest.mock('child_process');
@@ -102,6 +105,34 @@ describe('mount.ts unit tests', () => {
         expect.stringContaining('CreateShortcut'),
         expect.anything()
       );
+    });
+  });
+  describe('processFolderMapping', () => {
+    it('should remove mount and warn if folder is inaccessible after mounting', () => {
+      jest.spyOn(os, 'platform').mockReturnValue('win32');
+      const osInfo = { ...getOs(), isWindows: true, isMac: false, isLinux: false };
+      
+      jest.spyOn(fs, 'existsSync').mockImplementation((pathStr) => false);
+      jest.spyOn(fs, 'mkdirSync').mockImplementation();
+      const mockAccessSync = jest.spyOn(fs, 'accessSync').mockImplementation(() => {
+        throw new Error('EACCES');
+      });
+      const rmSyncSpy = jest.spyOn(fs, 'rmSync').mockImplementation();
+      const warnSpy = jest.spyOn(signale, 'warn').mockImplementation();
+
+      processFolderMapping({
+        folderMapping: { id: '123', title: 'Test Project' } as any,
+        baseDir: 'C:\\Users\\testuser\\RDSS',
+        mountsDir: 'C:\\Users\\testuser\\RDSS\\.mounts',
+        remotePath: '\\\\remote\\path',
+        truncateLength: 40,
+        osInfo,
+        debug: false,
+      });
+
+      expect(mockAccessSync).toHaveBeenCalledWith(expect.stringContaining('Test Project'), fs.constants.R_OK);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Folder mapped but not accessible'));
+      expect(rmSyncSpy).toHaveBeenCalled();
     });
   });
 });

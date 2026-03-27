@@ -321,6 +321,15 @@ export const processFolderMapping = ({
     } else {
       mountLinux(mountOptions);
     }
+
+    try {
+      fs.accessSync(localPath, fs.constants.R_OK);
+    } catch {
+      signale.warn(`Folder mapped but not accessible: ${localPath}. Removing mapping.`);
+      removeMapping(localPath, debug, osInfo);
+      return;
+    }
+
     if (debug) {
       signale.debug(`Successfully mounted ${remote} to ${localPath}`);
     }
@@ -368,32 +377,36 @@ export const resetMountsDir = (mountsDir: string, debug: boolean, osInfo: OsInfo
   }
 };
 
+export const removeMapping = (localPath: string, debug: boolean, osInfo: OsInfo) => {
+  try {
+    if (osInfo.isWindows) {
+      fs.rmSync(localPath, { recursive: true, force: true });
+      fs.rmSync(`${localPath}.lnk`, { force: true });
+    } else {
+      const stat = fs.lstatSync(localPath);
+      if (stat.isSymbolicLink()) {
+        fs.unlinkSync(localPath);
+      } else {
+        if (osInfo.isMac) {
+          execSync(`umount "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
+        } else {
+          execSync(`sudo umount "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
+        }
+        fs.rmdirSync(localPath);
+      }
+    }
+  } catch (error: unknown) {
+    handleUnmountError(error, localPath, debug);
+  }
+};
+
 export const resetBaseDirMappings = (baseDir: string, debug: boolean, ignoreList: string[], osInfo: OsInfo) => {
   const folders = fs.readdirSync(baseDir);
   for (const folder of folders) {
     if (ignoreList.includes(folder)) continue;
     const localPath = path.join(baseDir, folder);
     signale.info(`Removing mapping for ${localPath}`);
-    try {
-      if (osInfo.isWindows) {
-        fs.rmSync(localPath, { recursive: true, force: true });
-        fs.rmSync(`${localPath}.lnk`, { force: true });
-      } else {
-        const stat = fs.lstatSync(localPath);
-        if (stat.isSymbolicLink()) {
-          fs.unlinkSync(localPath);
-        } else {
-          if (osInfo.isMac) {
-            execSync(`umount "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
-          } else {
-            execSync(`sudo umount "${localPath}"`, { stdio: debug ? 'pipe' : 'ignore' });
-          }
-          fs.rmdirSync(localPath);
-        }
-      }
-    } catch (error: unknown) {
-      handleUnmountError(error, localPath, debug);
-    }
+    removeMapping(localPath, debug, osInfo);
   }
 };
 
