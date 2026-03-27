@@ -322,12 +322,14 @@ export const processFolderMapping = ({
       mountLinux(mountOptions);
     }
 
-    try {
-      fs.accessSync(localPath, fs.constants.R_OK);
-    } catch {
-      signale.warn(`Folder mapped but not accessible: ${localPath}. Removing mapping.`);
-      removeMapping(localPath, debug, osInfo);
-      return;
+    if (!osInfo.isWindows) {
+      try {
+        fs.accessSync(localPath, fs.constants.R_OK);
+      } catch {
+        signale.warn(`Folder mapped but not accessible: ${localPath}. Removing mapping.`);
+        removeMapping(localPath, debug, osInfo);
+        return;
+      }
     }
 
     if (debug) {

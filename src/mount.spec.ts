@@ -109,15 +109,17 @@ describe('mount.ts unit tests', () => {
   });
   describe('processFolderMapping', () => {
     it('should remove mount and warn if folder is inaccessible after mounting', () => {
-      jest.spyOn(os, 'platform').mockReturnValue('win32');
-      const osInfo = { ...getOs(), isWindows: true, isMac: false, isLinux: false };
+      jest.spyOn(os, 'platform').mockReturnValue('darwin');
+      const osInfo = { ...getOs(), isWindows: false, isMac: true, isLinux: false };
       
       jest.spyOn(fs, 'existsSync').mockImplementation((pathStr) => false);
       jest.spyOn(fs, 'mkdirSync').mockImplementation();
+      jest.spyOn(fs, 'symlinkSync').mockImplementation();
       const mockAccessSync = jest.spyOn(fs, 'accessSync').mockImplementation(() => {
         throw new Error('EACCES');
       });
-      const rmSyncSpy = jest.spyOn(fs, 'rmSync').mockImplementation();
+      jest.spyOn(fs, 'lstatSync').mockReturnValue({ isSymbolicLink: () => true } as fs.Stats);
+      const unlinkSyncSpy = jest.spyOn(fs, 'unlinkSync').mockImplementation();
       const warnSpy = jest.spyOn(signale, 'warn').mockImplementation();
 
       processFolderMapping({
@@ -132,7 +134,7 @@ describe('mount.ts unit tests', () => {
 
       expect(mockAccessSync).toHaveBeenCalledWith(expect.stringContaining('Test Project'), fs.constants.R_OK);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Folder mapped but not accessible'));
-      expect(rmSyncSpy).toHaveBeenCalled();
+      expect(unlinkSyncSpy).toHaveBeenCalled();
     });
   });
 });
