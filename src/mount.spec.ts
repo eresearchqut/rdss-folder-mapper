@@ -7,6 +7,7 @@ import {
   getFolderName,
   getIgnoredItems,
   sanitizeErrorMessage,
+  setupBaseDirectory,
 } from './mount';
 import { getOs } from './os';
 
@@ -85,6 +86,22 @@ describe('mount.ts unit tests', () => {
     it('should obscure password in string', () => {
       const error = new Error('Failed to connect with password MySecret123');
       expect(sanitizeErrorMessage(error, 'MySecret123')).toBe('Failed to connect with password ***');
+    });
+  });
+  describe('setupBaseDirectory', () => {
+    it('should create desktop shortcut on Windows if not exists', () => {
+      jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\testuser');
+      jest.spyOn(fs, 'existsSync').mockImplementation((pathStr) => {
+        if (typeof pathStr === 'string' && pathStr.endsWith('RDSS.lnk')) return false;
+        return true;
+      });
+      jest.spyOn(fs, 'readdirSync').mockReturnValue([] as any);
+      
+      setupBaseDirectory('C:\\Users\\testuser\\RDSS', false, { ...getOs(), isWindows: true });
+      expect(child_process.execSync).toHaveBeenCalledWith(
+        expect.stringContaining('CreateShortcut'),
+        expect.anything()
+      );
     });
   });
 });

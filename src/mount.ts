@@ -78,9 +78,23 @@ export const setupBaseDirectory = (baseDir: string, debug: boolean, osInfo: OsIn
       reset(debug, baseDir, osInfo);
     }
   }
-  if (!osInfo.isWindows && !fs.existsSync(mountsDir)) {
+
+  if (osInfo.isWindows) {
+    try {
+      const desktopPath = path.join(os.homedir(), 'Desktop');
+      const shortcutPath = path.join(desktopPath, `${path.basename(baseDir)}.lnk`);
+      if (!fs.existsSync(shortcutPath)) {
+        if (debug) signale.debug(`Creating Desktop shortcut for ${baseDir} at ${shortcutPath}`);
+        const psCmd = `$s=(New-Object -COM WScript.Shell).CreateShortcut('${shortcutPath}');$s.TargetPath='${baseDir}';$s.Save()`;
+        execSync(`powershell -command "${psCmd}"`, { stdio: debug ? 'pipe' : 'ignore' });
+      }
+    } catch (error) {
+      if (debug) signale.debug(`Failed to create Desktop shortcut: ${error}`);
+    }
+  } else if (!fs.existsSync(mountsDir)) {
     fs.mkdirSync(mountsDir, { recursive: true });
   }
+  
   return mountsDir;
 };
 
