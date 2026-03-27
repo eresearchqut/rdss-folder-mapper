@@ -7,3 +7,6 @@ folders.local.json
 config.json
 plans.json
 .env
+tmp
+sea-config.json
+folders.json
