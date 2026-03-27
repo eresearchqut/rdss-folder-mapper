@@ -205,7 +205,7 @@ export const mountWindows = (options: MountOptions) => {
     execSync(cmd, { stdio: debug ? 'pipe' : 'ignore' });
   }
   try {
-    const mklinkCmd = `mklink /D "${localPath}" "${remotePath}"`;
+    const mklinkCmd = `mklink /j "${localPath.replace(/\//g, '\\')}" "${remotePath.replace(/\//g, '\\')}"`;
     if (debug) signale.debug(`Executing: ${mklinkCmd}`);
     execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
   } catch (error) {
