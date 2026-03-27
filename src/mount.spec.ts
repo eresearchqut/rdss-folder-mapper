@@ -20,12 +20,14 @@ describe('mount.ts unit tests', () => {
   describe('isMounted', () => {
     it('should return true if lstatSync indicates a symbolic link on Windows', () => {
       jest.spyOn(os, 'platform').mockReturnValue('win32');
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
       jest.spyOn(fs, 'lstatSync').mockReturnValue({ isSymbolicLink: () => true } as fs.Stats);
       expect(isMounted('C:\\local', '\\\\remote', getOs())).toBe(true);
     });
 
     it('should return false if lstatSync indicates not a symbolic link on Windows', () => {
       jest.spyOn(os, 'platform').mockReturnValue('win32');
+      jest.spyOn(fs, 'existsSync').mockReturnValue(true);
       jest.spyOn(fs, 'lstatSync').mockReturnValue({ isSymbolicLink: () => false } as fs.Stats);
       expect(isMounted('C:\\local', '\\\\remote', getOs())).toBe(false);
     });

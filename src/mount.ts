@@ -19,8 +19,14 @@ const INVALID_CHARS_REGEX = /[<>:"/\\|?*\x00-\x1F]/g;
 export const isMounted = (localPath: string, mountPath: string, osInfo: OsInfo): boolean => {
   try {
     if (osInfo.isWindows) {
-      const stat = fs.lstatSync(localPath);
-      return stat.isSymbolicLink();
+      if (fs.existsSync(localPath)) {
+        const stat = fs.lstatSync(localPath);
+        return stat.isSymbolicLink();
+      }
+      if (fs.existsSync(`${localPath}.lnk`)) {
+        return true;
+      }
+      return false;
     } else {
       const mountOutput = execSync('mount', { encoding: 'utf8' });
       const lines = mountOutput.split('\n');
@@ -184,9 +190,15 @@ export const mountWindows = (options: MountOptions) => {
     if (debug) signale.debug(`Executing: net use "${remotePath}" "***" /user:"${userWithDomain}"`);
     execSync(cmd, { stdio: debug ? 'pipe' : 'ignore' });
   }
-  const mklinkCmd = `mklink /D "${localPath}" "${remotePath}"`;
-  if (debug) signale.debug(`Executing: ${mklinkCmd}`);
-  execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
+  try {
+    const mklinkCmd = `mklink /D "${localPath}" "${remotePath}"`;
+    if (debug) signale.debug(`Executing: ${mklinkCmd}`);
+    execSync(mklinkCmd, { stdio: debug ? 'pipe' : 'ignore' });
+  } catch (error) {
+    if (debug) signale.debug(`mklink failed (likely insufficient permissions), falling back to Windows shortcut (.lnk)`);
+    const psCmd = `$s=(New-Object -COM WScript.Shell).CreateShortcut('${localPath}.lnk');$s.TargetPath='${remotePath}';$s.Save()`;
+    execSync(`powershell -command "${psCmd}"`, { stdio: debug ? 'pipe' : 'ignore' });
+  }
 }
 
 export const mountMac = (options: MountOptions) => {
@@ -351,6 +363,7 @@ export const resetBaseDirMappings = (baseDir: string, debug: boolean, ignoreList
     try {
       if (osInfo.isWindows) {
         fs.rmSync(localPath, { recursive: true, force: true });
+        fs.rmSync(`${localPath}.lnk`, { force: true });
       } else {
         const stat = fs.lstatSync(localPath);
         if (stat.isSymbolicLink()) {
