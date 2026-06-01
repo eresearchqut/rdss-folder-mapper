@@ -200,8 +200,51 @@ ipcMain.handle('open-log-file', async () => {
   await shell.openPath(logPath);
 });
 
+/**
+ * On macOS, accessing the Desktop folder requires user permission (TCC).
+ * If the base directory is inaccessible, prompt the user via the native
+ * folder picker — this is the standard way to trigger the macOS permission
+ * grant for unsigned/development builds.  Returns true if access is confirmed.
+ */
+const ensureBaseDirAccess = async (baseDir: string): Promise<boolean> => {
+  try {
+    if (fs.existsSync(baseDir)) {
+      fs.readdirSync(baseDir);
+    } else {
+      fs.mkdirSync(baseDir, { recursive: true });
+    }
+    return true;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== 'EPERM') throw err;
+  }
+
+  // EPERM — ask the user to grant access via the native folder picker.
+  mainWindow?.webContents.send('log', `⚠ Permission required: please select or confirm the folder location to grant access.`);
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Grant access to your mappings folder',
+    message: 'RDSS Folder Mapper needs permission to access this folder. Please select it to continue.',
+    defaultPath: baseDir,
+    properties: ['openDirectory', 'createDirectory'],
+  });
+
+  if (result.canceled) return false;
+
+  // Re-test access after the user has confirmed via the picker.
+  try {
+    fs.readdirSync(result.filePaths[0]);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 ipcMain.handle('map-folders', async () => {
-  return runInWorker('refresh', loadConfig());
+  const cfg = loadConfig();
+  if (!(await ensureBaseDirAccess(cfg.baseDir))) {
+    mainWindow?.webContents.send('log', `✗ Access to ${cfg.baseDir} was denied. Please grant permission in System Settings → Privacy & Security → Files and Folders.`);
+    return { success: false };
+  }
+  return runInWorker('refresh', cfg);
 });
 
 ipcMain.handle('remove-mappings', async () => {

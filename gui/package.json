@@ -39,7 +39,10 @@
           ]
         }
       ],
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "extendInfo": {
+        "NSDesktopFolderUsageDescription": "RDSS Folder Mapper needs access to your Desktop folder to create and manage research storage shortcuts."
+      }
     },
     "win": {
       "target": [

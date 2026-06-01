@@ -80,7 +80,15 @@ export const setupBaseDirectory = (baseDir: string, debug: boolean, osInfo: OsIn
     fs.mkdirSync(baseDir, { recursive: true });
   } else {
     const ignoreList = getIgnoredItems();
-    const existingItems = fs.readdirSync(baseDir).filter((item) => !ignoreList.includes(item));
+    let existingItems: string[] = [];
+    try {
+      existingItems = fs.readdirSync(baseDir).filter((item) => !ignoreList.includes(item));
+    } catch {
+      // EPERM can occur when active mount points prevent the directory from being
+      // enumerated (common on macOS with SMB mounts). Proceed without resetting —
+      // the mapping step will handle stale mounts individually.
+      if (debug) signale.debug(`Could not read ${baseDir} — skipping pre-reset`);
+    }
     if (existingItems.length > 0) {
       reset(debug, baseDir, osInfo);
     }

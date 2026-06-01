@@ -118,6 +118,19 @@ describe('mount.ts unit tests', () => {
         expect.anything(),
       );
     });
+
+    it('should not throw when readdirSync throws EPERM (active mounts blocking enumeration)', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockImplementation(() => {
+        const err = Object.assign(new Error('EPERM'), { code: 'EPERM' });
+        throw err;
+      });
+      vi.mocked(fs.mkdirSync).mockReturnValue(undefined as any);
+
+      expect(() =>
+        setupBaseDirectory('/home/testuser/Desktop/RDSS Folders', false, { ...getOs(), isWindows: false, isMac: true, isLinux: false })
+      ).not.toThrow();
+    });
   });
 
   describe('processFolderMapping', () => {
