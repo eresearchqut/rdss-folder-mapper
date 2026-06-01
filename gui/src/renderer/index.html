@@ -156,6 +156,8 @@
     .btn-secondary { background: var(--qut-white); color: var(--qut-text); border: 1px solid var(--qut-border); }
     .btn-secondary:not(:disabled):hover { background: var(--qut-pale); }
     .btn-secondary.hidden { display: none; }
+    .btn-danger { background: var(--qut-white); color: #c0392b; border: 1px solid #c0392b; }
+    .btn-danger:not(:disabled):hover { background: #fdf0ef; }
     .btn-cancel { background: var(--qut-white); color: #b71c1c; border: 1px solid #e57373; }
     .btn-cancel:not(:disabled):hover { background: #fff5f5; }
     .btn-cancel.hidden { display: none; }
@@ -280,6 +282,10 @@
       <button class="btn btn-secondary" id="btnCancel" style="flex:1">Cancel</button>
       <button class="btn btn-primary" id="btnSave" style="flex:2">Save settings</button>
     </div>
+
+    <div class="settings-actions" style="margin-top:8px">
+      <button class="btn btn-danger" id="btnSignOut" style="flex:1">Sign out</button>
+    </div>
   </div>
 
   <script>
@@ -299,6 +305,7 @@
     const btnBrowse     = document.getElementById('btnBrowse');
     const btnSave       = document.getElementById('btnSave');
     const btnCancel     = document.getElementById('btnCancel');
+    const btnSignOut    = document.getElementById('btnSignOut');
     const versionTag    = document.getElementById('versionTag');
     const btnActivityLog = document.getElementById('btnActivityLog');
 
@@ -418,6 +425,17 @@
       currentConfig = config;
       locationPath.textContent = config.baseDir;
       showMain();
+    });
+
+    btnSignOut.addEventListener('click', async () => {
+      btnSignOut.disabled = true;
+      btnSignOut.textContent = 'Signing out…';
+      await window.api.clearAuth();
+      btnSignOut.textContent = 'Signed out ✓';
+      setTimeout(() => {
+        btnSignOut.textContent = 'Sign out';
+        btnSignOut.disabled = false;
+      }, 2000);
     });
 
     const resetProgress = () => {

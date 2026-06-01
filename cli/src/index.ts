@@ -30,6 +30,7 @@ export { transformPlansToFolders, performLogin };
 export type { AuthEvent } from './auth';
 export { reset } from './mount';
 export { getOs } from './os';
+export { clearCredentialsFromKeychain } from './secrets';
 
 export type RefreshEvent =
   | { type: 'auth:start' }

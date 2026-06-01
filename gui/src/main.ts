@@ -251,6 +251,10 @@ ipcMain.handle('remove-mappings', async () => {
   return runInWorker('reset', loadConfig());
 });
 
+ipcMain.handle('clear-auth', async () => {
+  return runInWorker('clear-auth', loadConfig());
+});
+
 ipcMain.handle('cancel-operation', async () => {
   if (activeWorker) {
     await activeWorker.terminate();

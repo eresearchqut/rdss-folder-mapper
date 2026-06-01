@@ -3,8 +3,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 interface Config {
   debug: boolean;
   baseDir: string;
-  dmpBaseUrl: string;
-  remotePath: string;
 }
 
 contextBridge.exposeInMainWorld('api', {
@@ -25,6 +23,8 @@ contextBridge.exposeInMainWorld('api', {
   mapFolders: (): Promise<{ success: boolean }> => ipcRenderer.invoke('map-folders'),
 
   removeMappings: (): Promise<{ success: boolean }> => ipcRenderer.invoke('remove-mappings'),
+
+  clearAuth: (): Promise<{ success: boolean }> => ipcRenderer.invoke('clear-auth'),
 
   onProgress: (callback: (data: { current: number; total: number; folderName: string }) => void) => {
     ipcRenderer.on('progress', (_event, data) => callback(data));

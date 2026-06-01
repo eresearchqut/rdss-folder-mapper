@@ -1,5 +1,5 @@
 import { parentPort } from 'worker_threads';
-import { refresh, reset, getOs } from 'rdss-folder-mapper';
+import { refresh, reset, getOs, clearCredentialsFromKeychain } from 'rdss-folder-mapper';
 import type { RefreshEvent } from 'rdss-folder-mapper';
 
 const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, '');
@@ -56,6 +56,8 @@ parentPort?.on('message', async ({ type, config }: { type: string; config: Worke
       });
     } else if (type === 'reset') {
       reset(config.debug, config.baseDir, getOs());
+    } else if (type === 'clear-auth') {
+      clearCredentialsFromKeychain(config.debug, getOs());
     }
     send({ type: 'done', success: process.exitCode === 0 });
   } catch (err: unknown) {
