@@ -1,11 +1,13 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { Worker } from 'worker_threads';
 import { BASE_DIR } from 'rdss-folder-mapper';
 
 let mainWindow: BrowserWindow | null = null;
 let activeWorker: import('worker_threads').Worker | null = null;
+let cancelRequested = false;
 const logLines: string[] = [];
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -108,10 +110,11 @@ app.on('window-all-closed', () => {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Runs 'refresh' or 'reset' in a worker thread so the main process event loop
- * (and therefore the renderer) stays responsive during blocking mount syscalls.
+ * Runs 'refresh', 'reset', or 'clear-auth' in a worker thread so the main
+ * process event loop (and therefore the renderer) stays responsive during
+ * blocking mount syscalls.
  */
-const runInWorker = (type: 'refresh' | 'reset', config: Config): Promise<{ success: boolean }> =>
+const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): Promise<{ success: boolean; cancelled: boolean }> =>
   new Promise((resolve) => {
     const deployConfig = loadDeploymentConfig();
     const osInfo = process.platform === 'win32';
@@ -140,9 +143,11 @@ const runInWorker = (type: 'refresh' | 'reset', config: Config): Promise<{ succe
         });
       } else if (msg.type === 'event') {
         mainWindow?.webContents.send('event', msg.event);
+      } else if (msg.type === 'credentials-required') {
+        mainWindow?.webContents.send('credentials-required', { defaultUsername: os.userInfo().username });
       } else if (msg.type === 'done') {
         activeWorker = null;
-        resolve({ success: msg.success ?? false });
+        resolve({ success: msg.success ?? false, cancelled: false });
         worker.terminate();
       }
     });
@@ -150,12 +155,12 @@ const runInWorker = (type: 'refresh' | 'reset', config: Config): Promise<{ succe
     worker.on('error', (err) => {
       activeWorker = null;
       mainWindow?.webContents.send('log', `✗ ${err.message}`);
-      resolve({ success: false });
+      resolve({ success: false, cancelled: cancelRequested });
     });
 
     worker.on('exit', () => {
       activeWorker = null;
-      resolve({ success: false });
+      resolve({ success: false, cancelled: cancelRequested });
     });
 
     worker.postMessage({ type, config: workerConfig });
@@ -200,6 +205,12 @@ ipcMain.handle('open-log-file', async () => {
   await shell.openPath(logPath);
 });
 
+ipcMain.handle('open-base-dir', async () => {
+  const cfg = loadConfig();
+  const expanded = cfg.baseDir.replace(/^~/, os.homedir());
+  await shell.openPath(expanded);
+});
+
 /**
  * On macOS, accessing the Desktop folder requires user permission (TCC).
  * If the base directory is inaccessible, prompt the user via the native
@@ -239,10 +250,11 @@ const ensureBaseDirAccess = async (baseDir: string): Promise<boolean> => {
 };
 
 ipcMain.handle('map-folders', async () => {
+  cancelRequested = false;
   const cfg = loadConfig();
   if (!(await ensureBaseDirAccess(cfg.baseDir))) {
     mainWindow?.webContents.send('log', `✗ Access to ${cfg.baseDir} was denied. Please grant permission in System Settings → Privacy & Security → Files and Folders.`);
-    return { success: false };
+    return { success: false, cancelled: false };
   }
   return runInWorker('refresh', cfg);
 });
@@ -255,9 +267,14 @@ ipcMain.handle('clear-auth', async () => {
   return runInWorker('clear-auth', loadConfig());
 });
 
-ipcMain.handle('cancel-operation', async () => {
+ipcMain.handle('submit-credentials', async (_event, credentials: { username: string; password: string; adDomain?: string }) => {
+  activeWorker?.postMessage({ type: 'credentials-response', credentials });
+});
+
+ipcMain.handle('cancel-operation', () => {
   if (activeWorker) {
-    await activeWorker.terminate();
+    cancelRequested = true;
+    activeWorker.terminate().catch(() => {}); // fire-and-forget — don't block the renderer
     activeWorker = null;
   }
 });

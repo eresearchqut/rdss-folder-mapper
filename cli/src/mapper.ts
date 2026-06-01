@@ -6,11 +6,18 @@ export interface FolderMapping {
   organisation?: string[];
 }
 
+export interface Collaborator {
+  researcher: { id: string };
+  role?: string;
+  isReadOnly: boolean;
+}
+
 export interface Plan {
   dataStorageId?: string;
   encodedId: string;
   project?: {
     title?: string;
+    collaborators?: Collaborator[];
     organisation?: {
       faculty?: { name?: string };
       school?: { name?: string };
@@ -24,15 +31,40 @@ export interface Plan {
   };
 }
 
-export const transformPlansToFolders = (plans: Plan[]): { folders: FolderMapping[] } => {
+export const transformPlansToFolders = (
+  plans: Plan[],
+  currentResearcherId?: string,
+  onExcluded?: (title: string | undefined, reason: string) => void,
+  onIncluded?: (title: string | undefined, reason: string) => void,
+): { folders: FolderMapping[] } => {
   const folders = plans
     .filter((plan: Plan) => !!plan.dataStorageId)
-    .filter(
-      (plan: Plan) =>
-        plan.projectMeta?.isLead === true ||
-        plan.projectMeta?.isSupervisor === true ||
-        plan.projectMeta?.editable === true,
-    )
+    .filter((plan: Plan) => {
+      const meta = plan.projectMeta;
+      // Check collaborator read-only status FIRST — editable can be true even for read-only collaborators.
+      if (meta?.isCollaborator) {
+        if (!currentResearcherId) {
+          onIncluded?.(plan.project?.title, 'collaborator — researcher ID unknown, deferring to SMB');
+          return true;
+        }
+        const myEntry = plan.project?.collaborators?.find(
+          (c) => c.researcher.id === currentResearcherId,
+        );
+        if (myEntry?.role?.toLowerCase() === 'read-only') {
+          onExcluded?.(plan.project?.title, 'read-only collaborator');
+          return false;
+        }
+        if (!myEntry) {
+          onIncluded?.(plan.project?.title, 'collaborator — not found in collaborators list, deferring to SMB');
+        } else {
+          onIncluded?.(plan.project?.title, 'collaborator — editable');
+        }
+        return true;
+      }
+      if (meta?.isLead || meta?.isSupervisor || meta?.editable) return true;
+      onExcluded?.(plan.project?.title, 'no matching role');
+      return false;
+    })
     .map((plan: Plan) => {
       const folder: FolderMapping = {
         id: plan.encodedId,

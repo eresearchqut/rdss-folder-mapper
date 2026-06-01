@@ -1,6 +1,6 @@
 import { parentPort } from 'worker_threads';
-import { refresh, reset, getOs, clearCredentialsFromKeychain } from 'rdss-folder-mapper';
-import type { RefreshEvent } from 'rdss-folder-mapper';
+import { refresh, reset, getOs, clearCredentialsFromKeychain, saveCredentialsToKeychain } from 'rdss-folder-mapper';
+import type { RefreshEvent, Credentials } from 'rdss-folder-mapper';
 
 const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, '');
 
@@ -30,9 +30,22 @@ interface WorkerConfig {
   authDomain?: string;
   callbackUrls?: string[];
   adDomain?: string;
+  username?: string;
+  password?: string;
 }
 
-parentPort?.on('message', async ({ type, config }: { type: string; config: WorkerConfig }) => {
+// Resolver set when the refresh flow is awaiting credentials from the main process.
+let credentialsResolver: ((creds: Credentials | undefined) => void) | null = null;
+
+parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; credentials?: Credentials }) => {
+  // Credentials response from main process (triggered by onCredentialsRequired callback).
+  if (msg.type === 'credentials-response') {
+    credentialsResolver?.(msg.credentials);
+    credentialsResolver = null;
+    return;
+  }
+
+  const { type, config } = msg as { type: string; config: WorkerConfig };
   const prevExitCode = process.exitCode;
   process.exitCode = 0;
   try {
@@ -53,11 +66,22 @@ parentPort?.on('message', async ({ type, config }: { type: string; config: Worke
         onEvent: (event: RefreshEvent) => {
           send({ type: 'event', event });
         },
+        onCredentialsRequired: () =>
+          new Promise<Credentials | undefined>((resolve) => {
+            credentialsResolver = resolve;
+            send({ type: 'credentials-required' });
+          }),
       });
     } else if (type === 'reset') {
       reset(config.debug, config.baseDir, getOs());
     } else if (type === 'clear-auth') {
       clearCredentialsFromKeychain(config.debug, getOs());
+    } else if (type === 'save-credentials') {
+      saveCredentialsToKeychain(
+        { username: config.username, password: config.password, adDomain: config.adDomain },
+        config.debug,
+        getOs(),
+      );
     }
     send({ type: 'done', success: process.exitCode === 0 });
   } catch (err: unknown) {

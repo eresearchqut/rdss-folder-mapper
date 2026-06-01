@@ -17,14 +17,22 @@ contextBridge.exposeInMainWorld('api', {
   hasShortcuts: (): Promise<boolean> => ipcRenderer.invoke('has-shortcuts'),
 
   openLogFile: (): Promise<void> => ipcRenderer.invoke('open-log-file'),
+  openBaseDir: (): Promise<void> => ipcRenderer.invoke('open-base-dir'),
 
   cancelOperation: (): Promise<void> => ipcRenderer.invoke('cancel-operation'),
 
-  mapFolders: (): Promise<{ success: boolean }> => ipcRenderer.invoke('map-folders'),
+  mapFolders: (): Promise<{ success: boolean; cancelled: boolean }> => ipcRenderer.invoke('map-folders'),
 
   removeMappings: (): Promise<{ success: boolean }> => ipcRenderer.invoke('remove-mappings'),
 
   clearAuth: (): Promise<{ success: boolean }> => ipcRenderer.invoke('clear-auth'),
+
+  submitCredentials: (credentials: { username: string; password: string; adDomain?: string }): Promise<void> =>
+    ipcRenderer.invoke('submit-credentials', credentials),
+
+  onCredentialsRequired: (callback: (data: { defaultUsername: string }) => void) => {
+    ipcRenderer.on('credentials-required', (_event, data) => callback(data));
+  },
 
   onProgress: (callback: (data: { current: number; total: number; folderName: string }) => void) => {
     ipcRenderer.on('progress', (_event, data) => callback(data));
@@ -42,5 +50,6 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.removeAllListeners('log');
     ipcRenderer.removeAllListeners('progress');
     ipcRenderer.removeAllListeners('event');
+    ipcRenderer.removeAllListeners('credentials-required');
   },
 });

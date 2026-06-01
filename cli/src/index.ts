@@ -30,7 +30,8 @@ export { transformPlansToFolders, performLogin };
 export type { AuthEvent } from './auth';
 export { reset } from './mount';
 export { getOs } from './os';
-export { clearCredentialsFromKeychain } from './secrets';
+export { clearCredentialsFromKeychain, getCredentialsFromKeychain, saveCredentialsToKeychain } from './secrets';
+export type { Credentials } from './secrets';
 
 export type RefreshEvent =
   | { type: 'auth:start' }
@@ -61,12 +62,14 @@ interface RefreshOptions {
   force?: boolean;
   onProgress?: (current: number, total: number, folderName: string) => void;
   onEvent?: (event: RefreshEvent) => void;
+  /** Called when no credentials are found in the keychain. Return credentials to use, or undefined to skip mounting. */
+  onCredentialsRequired?: () => Promise<Credentials | undefined>;
 }
 
-const resolveCredentials = (
+const resolveCredentials = async (
   options: RefreshOptions,
   osInfo: OsInfo,
-): Credentials => {
+): Promise<Credentials> => {
   const keychainCreds = getCredentialsFromKeychain(options.debug || false, osInfo);
   let { username, password, adDomain } = keychainCreds;
 
@@ -76,6 +79,21 @@ const resolveCredentials = (
     if (options.debug)
       signale.info(`No username provided, defaulting to executing user: ${username}`);
   }
+
+  if (!username && !password && options.onCredentialsRequired) {
+    const provided = await options.onCredentialsRequired();
+    if (provided) {
+      if (provided.username || provided.password) {
+        saveCredentialsToKeychain(provided, options.debug || false, osInfo);
+      }
+      return {
+        username: provided.username,
+        password: provided.password,
+        adDomain: provided.adDomain || adDomain,
+      };
+    }
+  }
+
   return { username, password, adDomain };
 };
 
@@ -100,7 +118,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
   signale.info('Refreshing drive mappings...');
   let credentials: Credentials | undefined;
   try {
-    credentials = resolveCredentials(options, osInfo);
+    credentials = await resolveCredentials(options, osInfo);
 
     if (options.force && fs.existsSync(foldersFile)) {
       if (debug) signale.debug(`Force option provided, removing existing ${foldersFile}`);
@@ -133,15 +151,40 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       }
 
       options.onEvent?.({ type: 'plans:fetching' });
+
+      const authHeaders = {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      };
+
+      // Fetch the current user's researcher record so we can filter read-only collaborations.
+      let currentResearcherId: string | undefined;
+      try {
+        const researcherUrl = `${apiUrl}/researcher`;
+        if (debug) signale.debug(`Fetching researcher profile from ${researcherUrl}...`);
+        const researcherResponse = await fetch(researcherUrl, { headers: authHeaders });
+        if (researcherResponse.ok) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const researcherData = await researcherResponse.json() as any;
+          // Handle both a direct object { id } and an array [ { id } ]
+          const record = Array.isArray(researcherData) ? researcherData[0] : researcherData;
+          currentResearcherId = record?.id;
+          if (currentResearcherId) {
+            signale.info(`Researcher profile resolved — ID: ${currentResearcherId}`);
+          } else {
+            signale.warn(`Researcher profile returned no id field; collaborator read-only filter will be skipped. Response: ${JSON.stringify(record)}`);
+          }
+        } else {
+          signale.warn(`Could not fetch researcher profile (${researcherResponse.status}); collaborator read-only filter will be skipped.`);
+        }
+      } catch (err) {
+        signale.warn(`Researcher profile fetch failed; collaborator read-only filter will be skipped. ${sanitizeErrorMessage(err)}`);
+      }
+
       const planUrl = `${apiUrl}/plan?includeArchived=true`;
       if (debug) signale.debug(`Fetching plans from ${planUrl}...`);
-      const response = await fetch(planUrl, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(planUrl, { headers: authHeaders });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch plans: ${response.status} ${await response.text()}`);
@@ -152,6 +195,9 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       const mappedFolders = transformPlansToFolders(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Array.isArray(plansData) ? plansData : (plansData as any).items || [],
+        currentResearcherId,
+        (title, reason) => signale.info(`Skipping folder "${title ?? '(untitled)'}" — ${reason}`),
+        (title, reason) => { if (debug) signale.debug(`Including folder "${title ?? '(untitled)'}" — ${reason}`); },
       );
 
       options.onEvent?.({ type: 'plans:fetched', count: mappedFolders.folders.length });

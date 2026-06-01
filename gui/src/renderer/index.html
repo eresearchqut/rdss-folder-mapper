@@ -176,19 +176,43 @@
     }
     .btn-activity-log:hover { color: var(--qut-navy); }
 
-    /* ── Settings panel ── */
+    /* ── Credentials modal overlay ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(20, 38, 94, 0.45);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-overlay.hidden { display: none; }
+
+    .modal-card {
+      background: var(--qut-white);
+      border-radius: 10px; padding: 22px 24px;
+      width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+    }
+    .modal-title {
+      font-size: 15px; font-weight: 700; color: var(--qut-navy); margin-bottom: 4px;
+    }
+    .modal-hint {
+      font-size: 12px; color: var(--qut-subtle); margin-bottom: 16px; line-height: 1.4;
+    }
+    .modal-card .field { margin-bottom: 12px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .modal-actions .btn { margin-bottom: 0; }
+
     .settings-title { font-size: 15px; font-weight: 700; color: var(--qut-navy); margin-bottom: 12px; }
 
     .field { margin-bottom: 10px; }
     .field > label:not(.checkbox-row) { display: block; font-size: 12px; font-weight: 600; color: var(--qut-subtle); margin-bottom: 5px; }
     .field .hint { font-size: 11px; color: #9aa5b2; margin-top: 4px; }
 
-    .field input[type="text"] {
+    .field input[type="text"],
+    .field input[type="password"] {
       width: 100%; padding: 9px 12px; border: 1px solid var(--qut-border); border-radius: 6px;
       font-size: 13px; color: var(--qut-text); background: var(--qut-white); outline: none;
       transition: border-color 0.15s;
     }
-    .field input[type="text"]:focus { border-color: var(--qut-blue); }
+    .field input[type="text"]:focus,
+    .field input[type="password"]:focus { border-color: var(--qut-blue); }
 
     .folder-row { display: flex; gap: 8px; }
     .folder-row input { flex: 1; min-width: 0; }
@@ -288,7 +312,77 @@
     </div>
   </div>
 
+  <!-- ── Credentials modal ── -->
+  <div class="modal-overlay hidden" id="modalCredentials">
+    <div class="modal-card">
+      <div class="modal-title">Network credentials required</div>
+      <div class="modal-hint">Enter your credentials to connect to the research storage. They will be saved securely in your keychain.</div>
+
+      <div class="field">
+        <label for="credUsername">Username</label>
+        <input type="text" id="credUsername" placeholder="Username" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label for="credPassword">Password</label>
+        <input type="password" id="credPassword" autocomplete="current-password" />
+      </div>
+      <div class="field">
+        <label for="credDomain">AD Domain <span style="font-weight:400;color:#9aa5b2">(optional)</span></label>
+        <input type="text" id="credDomain" placeholder="e.g. QUT" autocomplete="off" />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnCredCancel" style="flex:1">Cancel</button>
+        <button class="btn btn-primary" id="btnCredSubmit" style="flex:2">Connect</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const modalCredentials = document.getElementById('modalCredentials');
+    const credUsername     = document.getElementById('credUsername');
+    const credPassword     = document.getElementById('credPassword');
+    const credDomain       = document.getElementById('credDomain');
+    const btnCredCancel    = document.getElementById('btnCredCancel');
+    const btnCredSubmit    = document.getElementById('btnCredSubmit');
+
+    const showCredentialsModal = (defaultUsername = '') => {
+      credUsername.value = defaultUsername;
+      credPassword.value = '';
+      credDomain.value   = '';
+      modalCredentials.classList.remove('hidden');
+      (defaultUsername ? credPassword : credUsername).focus();
+    };
+
+    const hideCredentialsModal = () => {
+      modalCredentials.classList.add('hidden');
+    };
+
+    btnCredCancel.addEventListener('click', async () => {
+      hideCredentialsModal();
+      // Send empty response so the worker doesn't hang
+      await window.api.submitCredentials({ username: '', password: '' });
+    });
+
+    btnCredSubmit.addEventListener('click', async () => {
+      const username = credUsername.value.trim();
+      const password = credPassword.value;
+      if (!username || !password) {
+        credUsername.style.borderColor = !username ? '#c62828' : '';
+        credPassword.style.borderColor = !password ? '#c62828' : '';
+        return;
+      }
+      credUsername.style.borderColor = '';
+      credPassword.style.borderColor = '';
+      hideCredentialsModal();
+      const adDomain = credDomain.value.trim() || undefined;
+      await window.api.submitCredentials({ username, password, adDomain });
+    });
+
+    credPassword.addEventListener('keydown', e => { if (e.key === 'Enter') btnCredSubmit.click(); });
+
+    window.api.onCredentialsRequired(({ defaultUsername }) => showCredentialsModal(defaultUsername));
+
     const panelMain     = document.getElementById('panelMain');
     const panelSettings = document.getElementById('panelSettings');
     const btnSettings   = document.getElementById('btnSettings');
@@ -374,14 +468,15 @@
       btnRemove.disabled = busy;
       btnSettings.disabled = busy;
       btnCancelOp.classList.toggle('hidden', !busy);
+      if (!busy) btnCancelOp.disabled = false; // re-arm for next operation
     };
 
     // Cancel in-progress operation
-    btnCancelOp.addEventListener('click', async () => {
-      await window.api.cancelOperation();
-      setStatus('Cancelled', '#888');
-      setBusy(false);
-      resetProgress();
+    btnCancelOp.addEventListener('click', () => {
+      setStatus('Cancelling…', '#888');
+      btnCancelOp.disabled = true;
+      hideCredentialsModal();
+      window.api.cancelOperation(); // fire-and-forget — mapFolders() will clean up busy state
     });
 
     // ── Settings toggle ──────────────────────────────────────────────────────
@@ -407,7 +502,7 @@
       panelSettings.classList.contains('hidden') ? showSettings() : showMain();
     });
 
-    locationChip.addEventListener('click', showSettings);
+    locationChip.addEventListener('click', () => window.api.openBaseDir());
 
     btnCancel.addEventListener('click', showMain);
 
@@ -453,7 +548,10 @@
 
       const result = await window.api.mapFolders();
 
-      if (result.success) {
+      if (result.cancelled) {
+        setStatus('Cancelled', '#888');
+        resetProgress();
+      } else if (result.success) {
         setStatus('All done! Folders are ready to open', '#2e7d32');
         progressFill.style.width = '100%';
         progressFill.classList.add('complete');
