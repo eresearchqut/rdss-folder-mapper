@@ -1,0 +1,250 @@
+import fs from 'fs';
+import os from 'os';
+import * as child_process from 'child_process';
+import {
+  isMounted,
+  isExistingFolder,
+  getFolderName,
+  getIgnoredItems,
+  sanitizeErrorMessage,
+  setupBaseDirectory,
+  processFolderMapping,
+  removeMapping,
+  mountMac,
+  mountLinux,
+  resetMountsDir,
+} from './mount';
+import signale from 'signale';
+import { getOs } from './os';
+import type { Mock } from 'vitest';
+
+vi.mock('fs');
+vi.mock('os');
+vi.mock('child_process');
+
+describe('mount.ts unit tests', () => {
+  beforeEach(() => {
+    // Restore constants since vi.mock auto-mock replaces them
+    vi.mocked(fs as any).constants = require('fs').constants;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('isMounted', () => {
+    it('should return true if lstatSync indicates a symbolic link on Windows', () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({ isSymbolicLink: () => true } as fs.Stats);
+      expect(isMounted('C:\\local', '\\\\remote', getOs())).toBe(true);
+    });
+
+    it('should return false if lstatSync indicates not a symbolic link on Windows', () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({ isSymbolicLink: () => false } as fs.Stats);
+      expect(isMounted('C:\\local', '\\\\remote', getOs())).toBe(false);
+    });
+
+    it('should parse mount output on non-Windows', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      (child_process.execSync as Mock).mockReturnValue('/dev/disk1s1 on /System/Volumes/Data (apfs, local, journaled)');
+      expect(isMounted('/local', '/System/Volumes/Data', getOs())).toBe(true);
+      expect(isMounted('/local', '/NonExistent', getOs())).toBe(false);
+    });
+  });
+
+  describe('isExistingFolder', () => {
+    it('should return true if path is directory and not symlink', () => {
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => false,
+        isDirectory: () => true,
+      } as fs.Stats);
+      expect(isExistingFolder('/test')).toBe(true);
+    });
+
+    it('should return false if path is symlink', () => {
+      vi.mocked(fs.lstatSync).mockReturnValue({
+        isSymbolicLink: () => true,
+        isDirectory: () => true,
+      } as fs.Stats);
+      expect(isExistingFolder('/test')).toBe(false);
+    });
+  });
+
+  describe('getFolderName', () => {
+    it('should return nickname if provided', () => {
+      expect(getFolderName({ id: '1', nickname: 'MyDrive', title: 'SomeTitle' } as any, 40)).toBe('MyDrive [1]');
+    });
+
+    it('should format title if nickname is omitted', () => {
+      expect(getFolderName({ id: '2', title: 'my cool project' } as any, 40)).toBe('My Cool Project [2]');
+    });
+
+    it('should fallback to id if title and nickname are omitted', () => {
+      expect(getFolderName({ id: '3' } as any, 40)).toBe('3 [3]');
+    });
+  });
+
+  describe('getIgnoredItems', () => {
+    it('should contain default ignores', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const ignores = getIgnoredItems();
+      expect(ignores).toContain('.DS_Store');
+      expect(ignores).toContain('desktop.ini');
+    });
+  });
+
+  describe('sanitizeErrorMessage', () => {
+    it('should obscure password in string', () => {
+      const error = new Error('Failed to connect with password MySecret123');
+      expect(sanitizeErrorMessage(error, 'MySecret123')).toBe('Failed to connect with password ***');
+    });
+  });
+
+  describe('setupBaseDirectory', () => {
+    it('should create mountsDir on non-Windows if it does not exist', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.mkdirSync).mockReturnValue(undefined as any);
+
+      setupBaseDirectory('/home/testuser/Desktop/RDSS Folders', false, { ...getOs(), isWindows: false, isMac: true, isLinux: false });
+      expect(fs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('.mounts'),
+        expect.objectContaining({ recursive: true }),
+      );
+      expect(child_process.execSync).not.toHaveBeenCalledWith(
+        expect.stringContaining('CreateShortcut'),
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('processFolderMapping', () => {
+    it('should remove mount and warn if folder is inaccessible after mounting', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const osInfo = { ...getOs(), isWindows: false, isMac: true, isLinux: false };
+
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.mkdirSync).mockReturnValue(undefined as any);
+      vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+      vi.mocked(fs.accessSync).mockImplementation(() => {
+        throw new Error('EACCES');
+      });
+      vi.mocked(fs.lstatSync).mockReturnValue({ isSymbolicLink: () => true } as fs.Stats);
+      vi.mocked(fs.unlinkSync).mockReturnValue(undefined as any);
+      const warnSpy = vi.spyOn(signale, 'warn').mockImplementation(() => {});
+
+      processFolderMapping({
+        folderMapping: { id: '123', title: 'Test Project' } as any,
+        baseDir: 'C:\\Users\\testuser\\RDSS',
+        mountsDir: 'C:\\Users\\testuser\\RDSS\\.mounts',
+        remotePath: '\\\\remote\\path',
+        truncateLength: 40,
+        osInfo,
+        debug: false,
+      });
+
+      expect(fs.accessSync).toHaveBeenCalledWith(expect.stringContaining('Test Project'), fs.constants.R_OK);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Folder mapped but not accessible'));
+      expect(fs.unlinkSync).toHaveBeenCalled();
+    });
+  });
+
+  describe('mountMac – C2 shell injection regression', () => {
+    it('calls execFileSync with an argument array instead of a shell string', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+
+      mountMac({
+      remotePath: 'smb://storage.example.com/projects',
+      localPath: '/home/user/Desktop/RDSS Folders/My Project [abc]',
+      mountPath: '/home/user/Desktop/RDSS Folders/.mounts/abc',
+      baseDir: '/home/user/Desktop/RDSS Folders',
+      os: 'darwin' as any,
+      debug: false,
+      });
+
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+      'mount_smbfs',
+      expect.arrayContaining(['smb://storage.example.com/projects', '/home/user/Desktop/RDSS Folders/.mounts/abc']),
+      expect.any(Object),
+      );
+      expect(child_process.execSync).not.toHaveBeenCalledWith(
+      expect.stringContaining('mount_smbfs'),
+      expect.anything(),
+      );
+    });
+
+    it('a mountPath with shell metacharacters is passed as a literal argument (no injection)', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+      const maliciousId = '"; rm -rf /; echo "';
+      const mountPath = `/mounts/${maliciousId}`;
+
+      mountMac({
+      remotePath: 'smb://host/share',
+      localPath: '/base/link',
+      mountPath,
+      baseDir: '/base',
+      os: 'darwin' as any,
+      debug: false,
+      });
+
+      const call = vi.mocked(child_process.execFileSync).mock.calls[0];
+      const args = call[1] as string[];
+      expect(args).toContain(mountPath);
+    });
+  });
+
+  describe('mountLinux – C2 shell injection regression', () => {
+    it('calls execFileSync with an argument array (no shell) for sudo mount', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+
+      mountLinux({
+      remotePath: 'smb://storage.example.com/projects',
+      localPath: '/home/user/Desktop/RDSS/My Project [abc]',
+      mountPath: '/home/user/Desktop/RDSS/.mounts/abc',
+      baseDir: '/home/user/Desktop/RDSS',
+      os: 'linux' as any,
+      debug: false,
+      credentials: { username: 'user', password: 's3cr3t', adDomain: 'qutad' },
+      });
+
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+      'sudo',
+      expect.arrayContaining(['mount', '-t', 'cifs', '-o']),
+      expect.any(Object),
+      );
+      expect(child_process.execSync).not.toHaveBeenCalledWith(
+      expect.stringContaining('mount -t cifs'),
+      expect.anything(),
+      );
+    });
+  });
+
+  describe('resetMountsDir – C2 umount regression', () => {
+    it('calls execFileSync for umount on macOS, not execSync', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue(['abc'] as any);
+      vi.mocked(fs.rmdirSync).mockReturnValue(undefined as any);
+
+      resetMountsDir('/mounts', false, { ...getOs(), isMac: true, isWindows: false, isLinux: false });
+
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+      'umount',
+      expect.arrayContaining([expect.stringContaining('abc')]),
+      expect.any(Object),
+      );
+      expect(child_process.execSync).not.toHaveBeenCalledWith(
+      expect.stringContaining('umount'),
+      expect.anything(),
+      );
+    });
+  });
+});

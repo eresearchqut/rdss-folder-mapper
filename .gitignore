@@ -1,0 +1,22 @@
+.junie
+.idea
+.test
+dist
+node_modules
+folders.local.json
+config.json
+plans.json
+.en
+tmp
+sea-config.json
+folders.json
+# workspace package outputs
+cli/dist
+cli/tmp
+cli/sea-config.json
+cli/tsconfig.tsbuildinfo
+gui/dist
+# docs generated artifacts
+docs/.vitepress/dist
+docs/.vitepress/cache
+docs/public/screenshots

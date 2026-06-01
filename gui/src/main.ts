@@ -1,0 +1,216 @@
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import fs from 'fs';
+import path from 'path';
+import { Worker } from 'worker_threads';
+import { BASE_DIR } from 'rdss-folder-mapper';
+
+let mainWindow: BrowserWindow | null = null;
+let activeWorker: import('worker_threads').Worker | null = null;
+const logLines: string[] = [];
+
+// ─── Config ──────────────────────────────────────────────────────────────────
+
+interface Config {
+  debug: boolean;
+  baseDir: string;
+}
+
+const defaultConfig = (): Config => ({
+  debug: false,
+  baseDir: BASE_DIR,
+});
+
+// Deployment config fields read from config.json alongside the binary/app.
+interface DeploymentConfig {
+  apiUrl?: string;
+  clientId?: string;
+  authDomain?: string;
+  callbackUrls?: string[];
+  adDomain?: string;
+  remotePath?: string;
+  remotePathNix?: string;
+  remotePathWin?: string;
+}
+
+const configPath = () => path.join(app.getPath('userData'), 'config.json');
+
+const loadConfig = (): Config => {
+  try {
+    const raw = fs.readFileSync(configPath(), 'utf8');
+    return { ...defaultConfig(), ...JSON.parse(raw) };
+  } catch {
+    return defaultConfig();
+  }
+};
+
+/**
+ * Loads the deployment config.json (OAuth credentials, remote paths, etc.)
+ * from a location relative to the app package.  In development this resolves
+ * to the repository root; in a packaged build it sits next to the resources
+ * directory.  Falls back to process.cwd() so CLI-style invocation also works.
+ */
+const loadDeploymentConfig = (): DeploymentConfig => {
+  const candidates = [
+    // Development: app.getAppPath() = gui/ → parent is project root
+    path.join(app.getAppPath(), '..', 'config.json'),
+    // Fallback: wherever the process was launched from
+    path.join(process.cwd(), 'config.json'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+        // Never propagate credentials from disk config
+        delete parsed.username;
+        delete parsed.password;
+        delete parsed.domain;
+        return parsed as DeploymentConfig;
+      } catch { /* ignore parse errors */ }
+    }
+  }
+  return {};
+};
+
+const saveConfig = (config: Config): void => {
+  fs.writeFileSync(configPath(), JSON.stringify(config, null, 2));
+};
+
+// ─── Window ───────────────────────────────────────────────────────────────────
+
+const createWindow = () => {
+  mainWindow = new BrowserWindow({
+    width: 520,
+    height: 560,
+    resizable: false,
+    title: 'RDSS Folder Mapper',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  mainWindow.loadFile(path.join(__dirname, '../src/renderer/index.html'));
+  mainWindow.setMenuBarVisibility(false);
+};
+
+app.whenReady().then(() => {
+  createWindow();
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Runs 'refresh' or 'reset' in a worker thread so the main process event loop
+ * (and therefore the renderer) stays responsive during blocking mount syscalls.
+ */
+const runInWorker = (type: 'refresh' | 'reset', config: Config): Promise<{ success: boolean }> =>
+  new Promise((resolve) => {
+    const deployConfig = loadDeploymentConfig();
+    const osInfo = process.platform === 'win32';
+    const deployRemotePath = deployConfig.remotePath
+      ?? (osInfo ? deployConfig.remotePathWin : deployConfig.remotePathNix);
+
+    const workerConfig = {
+      ...deployConfig,
+      debug: config.debug,
+      baseDir: config.baseDir,
+      remotePath: deployRemotePath,
+    };
+
+    const worker = new Worker(path.join(__dirname, 'worker.js'));
+    activeWorker = worker;
+
+    worker.on('message', (msg: { type: string; line?: string; current?: number; total?: number; folderName?: string; success?: boolean; event?: object }) => {
+      if (msg.type === 'log') {
+        logLines.push(msg.line ?? '');
+        mainWindow?.webContents.send('log', msg.line);
+      } else if (msg.type === 'progress') {
+        mainWindow?.webContents.send('progress', {
+          current: msg.current,
+          total: msg.total,
+          folderName: msg.folderName,
+        });
+      } else if (msg.type === 'event') {
+        mainWindow?.webContents.send('event', msg.event);
+      } else if (msg.type === 'done') {
+        activeWorker = null;
+        resolve({ success: msg.success ?? false });
+        worker.terminate();
+      }
+    });
+
+    worker.on('error', (err) => {
+      activeWorker = null;
+      mainWindow?.webContents.send('log', `✗ ${err.message}`);
+      resolve({ success: false });
+    });
+
+    worker.on('exit', () => {
+      activeWorker = null;
+      resolve({ success: false });
+    });
+
+    worker.postMessage({ type, config: workerConfig });
+  });
+
+// ─── IPC handlers ────────────────────────────────────────────────────────────
+
+ipcMain.handle('get-config', () => loadConfig());
+
+ipcMain.handle('save-config', (_event, config: Config) => {
+  saveConfig(config);
+});
+
+ipcMain.handle('pick-folder', async () => {
+  const cfg = loadConfig();
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Select base folder for mappings',
+    defaultPath: cfg.baseDir,
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle('get-version', () => app.getVersion());
+
+ipcMain.handle('has-shortcuts', () => {
+  const cfg = loadConfig();
+  const ignored = new Set(['.mounts', '.DS_Store', 'desktop.ini', 'Thumbs.db', '.mountignore']);
+  try {
+    return fs.readdirSync(cfg.baseDir).some(item => !ignored.has(item));
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle('open-log-file', async () => {
+  const logPath = path.join(app.getPath('userData'), 'activity.log');
+  const content = logLines.length > 0
+    ? logLines.join('\n') + '\n'
+    : '(No activity recorded yet)\n';
+  fs.writeFileSync(logPath, content, 'utf8');
+  await shell.openPath(logPath);
+});
+
+ipcMain.handle('map-folders', async () => {
+  return runInWorker('refresh', loadConfig());
+});
+
+ipcMain.handle('remove-mappings', async () => {
+  return runInWorker('reset', loadConfig());
+});
+
+ipcMain.handle('cancel-operation', async () => {
+  if (activeWorker) {
+    await activeWorker.terminate();
+    activeWorker = null;
+  }
+});

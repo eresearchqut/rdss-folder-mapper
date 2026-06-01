@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'" />
+  <title>RDSS Folder Mapper</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── QUT brand tokens ── */
+    :root {
+      --qut-navy:       #14265e;
+      --qut-blue:       #24449a;
+      --qut-light-blue: #d3daeb;
+      --qut-pale:       #eef1f7;
+      --qut-text:       #373a3c;
+      --qut-subtle:     #5a656b;
+      --qut-bg:         #f5f7fa;
+      --qut-border:     #d3daeb;
+      --qut-white:      #ffffff;
+    }
+
+    body {
+      font-family: "Helvetica Neue", -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--qut-bg);
+      color: var(--qut-text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--qut-navy);
+      padding: 14px 20px;
+      flex-shrink: 0;
+    }
+
+    .topbar-brand { display: flex; align-items: center; gap: 10px; }
+
+    .qut-badge {
+      background: var(--qut-white);
+      color: var(--qut-navy);
+      font-size: 11px; font-weight: 900;
+      letter-spacing: 0.5px;
+      padding: 3px 7px;
+      border-radius: 3px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    h1 {
+      font-size: 15px; font-weight: 600;
+      color: var(--qut-white);
+      letter-spacing: 0.1px;
+    }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: rgba(255,255,255,0.75);
+      padding: 5px 7px;
+      border-radius: 6px;
+      line-height: 1;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-icon:hover { background: rgba(255,255,255,0.15); color: var(--qut-white); }
+    .btn-icon.active { background: rgba(255,255,255,0.2); color: var(--qut-white); }
+    .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Panels ── */
+    .panel { display: flex; flex-direction: column; flex: 1; padding: 14px 20px 12px; overflow: hidden; }
+    .panel.hidden { display: none; }
+
+    /* ── Main panel ── */
+    /* ── Status card ── */
+    .status-card {
+      background: var(--qut-white);
+      border: 1px solid var(--qut-border); border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 8px;
+    }
+
+    .status-row { display: flex; align-items: center; gap: 8px; }
+
+    .status-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #2e7d32; flex-shrink: 0; transition: background 0.2s;
+    }
+    .status-text { font-size: 13px; font-weight: 600; color: var(--qut-text); }
+
+    .status-log-link {
+      margin-left: auto; background: none; border: none; cursor: pointer; padding: 0;
+      font-size: 12px; font-weight: 600; color: #c62828; transition: color 0.15s;
+    }
+    .status-log-link:hover { color: #b71c1c; }
+    .status-log-link.hidden { display: none; }
+
+    /* ── Progress (inside status card) ── */
+    .progress-section {
+      margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--qut-border);
+    }
+    .progress-section.hidden { display: none; }
+
+    .progress-header {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .progress-label { font-size: 12px; font-weight: 600; color: var(--qut-text); }
+    .progress-count { font-size: 11px; color: var(--qut-subtle); }
+
+    .progress-track {
+      height: 6px; background: var(--qut-light-blue); border-radius: 3px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; background: var(--qut-blue); border-radius: 3px;
+      transition: width 0.25s ease; width: 0%;
+    }
+    .progress-fill.complete { background: #2e7d32; }
+    .progress-folder {
+      font-size: 11px; color: var(--qut-subtle); margin-top: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ── Location chip ── */
+    .location-chip {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--qut-pale); border: 1px solid var(--qut-light-blue); border-radius: 8px;
+      padding: 8px 14px; margin-bottom: 14px; overflow: hidden;
+      cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    }
+    .location-chip:hover { background: var(--qut-light-blue); border-color: var(--qut-blue); }
+    .location-chip.hidden { display: none; }
+    .location-chip-icon { font-size: 14px; flex-shrink: 0; }
+    .location-chip-path {
+      font-size: 12px; font-weight: 500; color: var(--qut-navy);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .btn {
+      width: 100%; padding: 10px 12px; border: none; border-radius: 6px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s, opacity 0.15s; margin-bottom: 6px;
+      letter-spacing: 0.1px;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--qut-blue); color: var(--qut-white); }
+    .btn-primary:not(:disabled):hover { background: var(--qut-navy); }
+    .btn-secondary { background: var(--qut-white); color: var(--qut-text); border: 1px solid var(--qut-border); }
+    .btn-secondary:not(:disabled):hover { background: var(--qut-pale); }
+    .btn-secondary.hidden { display: none; }
+    .btn-cancel { background: var(--qut-white); color: #b71c1c; border: 1px solid #e57373; }
+    .btn-cancel:not(:disabled):hover { background: #fff5f5; }
+    .btn-cancel.hidden { display: none; }
+
+    /* ── Bottom bar ── */
+    .bottom-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: auto; padding-top: 10px;
+      border-top: 1px solid var(--qut-border);
+    }
+    .version-tag { font-size: 11px; color: #aab2c0; font-weight: 500; }
+    .btn-activity-log {
+      background: none; border: none; cursor: pointer; padding: 0;
+      font-size: 11px; color: var(--qut-blue); font-weight: 600;
+      transition: color 0.15s;
+    }
+    .btn-activity-log:hover { color: var(--qut-navy); }
+
+    /* ── Settings panel ── */
+    .settings-title { font-size: 15px; font-weight: 700; color: var(--qut-navy); margin-bottom: 12px; }
+
+    .field { margin-bottom: 10px; }
+    .field > label:not(.checkbox-row) { display: block; font-size: 12px; font-weight: 600; color: var(--qut-subtle); margin-bottom: 5px; }
+    .field .hint { font-size: 11px; color: #9aa5b2; margin-top: 4px; }
+
+    .field input[type="text"] {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--qut-border); border-radius: 6px;
+      font-size: 13px; color: var(--qut-text); background: var(--qut-white); outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input[type="text"]:focus { border-color: var(--qut-blue); }
+
+    .folder-row { display: flex; gap: 8px; }
+    .folder-row input { flex: 1; min-width: 0; }
+    .btn-browse {
+      padding: 9px 14px; background: var(--qut-white); border: 1px solid var(--qut-border);
+      border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--qut-text);
+      cursor: pointer; white-space: nowrap; transition: background 0.15s; flex-shrink: 0;
+    }
+    .btn-browse:hover { background: var(--qut-pale); }
+
+    .checkbox-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--qut-white); border: 1px solid var(--qut-border); border-radius: 8px;
+      padding: 11px 14px; cursor: pointer;
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: 16px; height: 16px; cursor: pointer; accent-color: var(--qut-blue);
+    }
+    .checkbox-row span { font-size: 13px; font-weight: 500; color: var(--qut-text); }
+
+    .settings-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 8px; }
+    .settings-actions .btn { margin-bottom: 0; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-brand">
+      <span class="qut-badge">QUT</span>
+      <h1>RDSS Folder Mapper</h1>
+    </div>
+    <button class="btn-icon" id="btnSettings" title="Settings">⚙</button>
+  </div>
+
+  <!-- ── Main panel ── -->
+  <div class="panel" id="panelMain">
+
+    <div class="status-card">
+      <div class="status-row">
+        <div class="status-dot" id="statusDot"></div>
+        <span class="status-text" id="statusText">Ready</span>
+        <button class="status-log-link hidden" id="statusLogLink">Activity log ↗</button>
+      </div>
+      <div class="progress-section hidden" id="progressSection">
+        <div class="progress-header">
+          <span class="progress-label" id="progressLabel">Mapping folders…</span>
+          <span class="progress-count" id="progressCount"></span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-folder" id="progressFolder"></div>
+      </div>
+    </div>
+
+    <div class="location-chip hidden" id="locationChip">
+      <span class="location-chip-icon">📁</span>
+      <span class="location-chip-path" id="locationPath"></span>
+    </div>
+
+    <button class="btn btn-primary" id="btnMap">Connect Research Folders</button>
+    <button class="btn btn-secondary" id="btnRemove">Remove Shortcuts</button>
+    <button class="btn btn-cancel hidden" id="btnCancelOp">Cancel</button>
+
+    <div class="bottom-bar">
+      <span class="version-tag" id="versionTag"></span>
+      <button class="btn-activity-log" id="btnActivityLog">Activity log ↗</button>
+    </div>
+  </div>
+
+  <!-- ── Settings panel ── -->
+  <div class="panel hidden" id="panelSettings">
+    <div class="settings-title">Settings</div>
+
+    <div class="field">
+      <label for="inputBaseDir">Mappings folder</label>
+      <div class="folder-row">
+        <input type="text" id="inputBaseDir" placeholder="e.g. ~/Desktop/RDSS Folders" />
+        <button class="btn-browse" id="btnBrowse">Browse…</button>
+      </div>
+      <div class="hint">Where mapped research folders will appear on your computer.</div>
+    </div>
+
+    <div class="field">
+      <label>Debug logging</label>
+      <label class="checkbox-row" for="chkDebug">
+        <input type="checkbox" id="chkDebug" />
+        <span>Enable verbose debug output in the activity log</span>
+      </label>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn btn-secondary" id="btnCancel" style="flex:1">Cancel</button>
+      <button class="btn btn-primary" id="btnSave" style="flex:2">Save settings</button>
+    </div>
+  </div>
+
+  <script>
+    const panelMain     = document.getElementById('panelMain');
+    const panelSettings = document.getElementById('panelSettings');
+    const btnSettings   = document.getElementById('btnSettings');
+    const dot           = document.getElementById('statusDot');
+    const statusText    = document.getElementById('statusText');
+    const statusLogLink = document.getElementById('statusLogLink');
+    const btnMap        = document.getElementById('btnMap');
+    const btnRemove     = document.getElementById('btnRemove');
+    const btnCancelOp   = document.getElementById('btnCancelOp');
+    const locationChip  = document.getElementById('locationChip');
+    const locationPath  = document.getElementById('locationPath');
+    const inputBaseDir   = document.getElementById('inputBaseDir');
+    const chkDebug      = document.getElementById('chkDebug');
+    const btnBrowse     = document.getElementById('btnBrowse');
+    const btnSave       = document.getElementById('btnSave');
+    const btnCancel     = document.getElementById('btnCancel');
+    const versionTag    = document.getElementById('versionTag');
+    const btnActivityLog = document.getElementById('btnActivityLog');
+
+    const progressSection = document.getElementById('progressSection');
+    const progressLabel   = document.getElementById('progressLabel');
+    const progressCount   = document.getElementById('progressCount');
+    const progressFill    = document.getElementById('progressFill');
+    const progressFolder  = document.getElementById('progressFolder');
+
+    let currentConfig = null;
+
+    const refreshRemoveButton = () =>
+      window.api.hasShortcuts().then(has => { btnRemove.classList.toggle('hidden', !has); });
+
+    // Populate version
+    window.api.getVersion().then(v => { versionTag.textContent = `v${v}`; });
+
+    // Load config, populate location chip, and set initial Remove button visibility
+    window.api.getConfig().then(cfg => {
+      currentConfig = cfg;
+      locationPath.textContent = cfg.baseDir;
+      locationChip.classList.remove('hidden');
+      refreshRemoveButton();
+    });
+
+    btnActivityLog.addEventListener('click', () => window.api.openLogFile());
+    statusLogLink.addEventListener('click', () => window.api.openLogFile());
+
+    // Progress events
+    window.api.onProgress(({ current, total, folderName }) => {
+      progressSection.classList.remove('hidden');
+      progressFill.classList.remove('complete');
+      const pct = total > 0 ? (current / total) * 100 : 0;
+      progressFill.style.width = pct + '%';
+      progressCount.textContent = `${current} / ${total}`;
+      progressLabel.textContent = current < total ? 'Connecting folders…' : 'Finishing up…';
+      progressFolder.textContent = folderName;
+    });
+
+    // Structured lifecycle events from the CLI
+    window.api.onEvent(event => {
+      if (event.type === 'auth:browser-opened') {
+        setStatus('Waiting for browser login…', '#f57c00');
+        progressSection.classList.remove('hidden');
+        progressLabel.textContent = 'Please complete login in your browser…';
+        progressFolder.textContent = String(event.url ?? '');
+      } else if (event.type === 'auth:complete') {
+        setStatus('Authenticated — connecting folders…', '#f57c00');
+        progressLabel.textContent = 'Fetching your folder list…';
+        progressFolder.textContent = '';
+      } else if (event.type === 'plans:fetching') {
+        progressLabel.textContent = 'Fetching folder list…';
+      } else if (event.type === 'mount:start') {
+        progressLabel.textContent = 'Connecting folders…';
+      }
+    });
+
+    const setStatus = (text, color, showLogLink = false) => {
+      statusText.textContent = text;
+      dot.style.background = color;
+      statusLogLink.classList.toggle('hidden', !showLogLink);
+    };
+
+    const setBusy = busy => {
+      btnMap.disabled = busy;
+      btnRemove.disabled = busy;
+      btnSettings.disabled = busy;
+      btnCancelOp.classList.toggle('hidden', !busy);
+    };
+
+    // Cancel in-progress operation
+    btnCancelOp.addEventListener('click', async () => {
+      await window.api.cancelOperation();
+      setStatus('Cancelled', '#888');
+      setBusy(false);
+      resetProgress();
+    });
+
+    // ── Settings toggle ──────────────────────────────────────────────────────
+
+    const showSettings = () => {
+      window.api.getConfig().then(cfg => {
+        currentConfig = cfg;
+        inputBaseDir.value   = cfg.baseDir;
+        chkDebug.checked   = cfg.debug;
+        panelMain.classList.add('hidden');
+        panelSettings.classList.remove('hidden');
+        btnSettings.classList.add('active');
+      });
+    };
+
+    const showMain = () => {
+      panelSettings.classList.add('hidden');
+      panelMain.classList.remove('hidden');
+      btnSettings.classList.remove('active');
+    };
+
+    btnSettings.addEventListener('click', () => {
+      panelSettings.classList.contains('hidden') ? showSettings() : showMain();
+    });
+
+    locationChip.addEventListener('click', showSettings);
+
+    btnCancel.addEventListener('click', showMain);
+
+    btnBrowse.addEventListener('click', async () => {
+      const picked = await window.api.pickFolder();
+      if (picked) inputBaseDir.value = picked;
+    });
+
+    btnSave.addEventListener('click', async () => {
+      const config = {
+        debug:   chkDebug.checked,
+        baseDir: inputBaseDir.value.trim(),
+      };
+      await window.api.saveConfig(config);
+      currentConfig = config;
+      locationPath.textContent = config.baseDir;
+      showMain();
+    });
+
+    const resetProgress = () => {
+      progressSection.classList.add('hidden');
+      progressFill.style.width = '0%';
+      progressFill.classList.remove('complete');
+      progressCount.textContent = '';
+      progressFolder.textContent = '';
+    };
+
+    btnMap.addEventListener('click', async () => {
+      resetProgress();
+      setBusy(true);
+      setStatus('Connecting folders…', '#f57c00');
+
+      const result = await window.api.mapFolders();
+
+      if (result.success) {
+        setStatus('All done! Folders are ready to open', '#2e7d32');
+        progressFill.style.width = '100%';
+        progressFill.classList.add('complete');
+        progressLabel.textContent = '✓ All folders connected';
+        progressFolder.textContent = '';
+      } else {
+        setStatus('Error', '#c62828', true);
+      }
+      setBusy(false);
+      refreshRemoveButton();
+    });
+
+    btnRemove.addEventListener('click', async () => {
+      resetProgress();
+      setBusy(true);
+      setStatus('Removing shortcuts…', '#f57c00');
+
+      const result = await window.api.removeMappings();
+
+      if (result.success) {
+        setStatus('Shortcuts removed', '#2e7d32');
+      } else {
+        setStatus('Error', '#c62828', true);
+      }
+      setBusy(false);
+      refreshRemoveButton();
+    });
+  </script>
+</body>
+</html>
