@@ -16,6 +16,44 @@ describe('secrets', () => {
   });
 });
 
+describe('clearCredentialsFromKeychain – clears both credentials and OAuth token', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(childProcess.execSync).mockReturnValue(Buffer.from(''));
+  });
+
+  it('deletes both rdss-folder-mapper and rdss-folder-mapper-token entries on macOS', () => {
+    vi.mocked(os.platform).mockReturnValue('darwin');
+    const osInfo = { ...getOs(), isMac: true, isWindows: false, isLinux: false };
+
+    secrets.clearCredentialsFromKeychain(false, osInfo);
+
+    const calls = vi.mocked(childProcess.execSync).mock.calls.map(c => c[0] as string);
+    expect(calls.some(c => c.includes('rdss-folder-mapper"') && !c.includes('token'))).toBe(true);
+    expect(calls.some(c => c.includes('rdss-folder-mapper-token'))).toBe(true);
+  });
+
+  it('deletes both entries on Linux', () => {
+    vi.mocked(os.platform).mockReturnValue('linux');
+    const osInfo = { ...getOs(), isMac: false, isWindows: false, isLinux: true };
+
+    secrets.clearCredentialsFromKeychain(false, osInfo);
+
+    const calls = vi.mocked(childProcess.execSync).mock.calls.map(c => c[0] as string);
+    expect(calls.some(c => c.includes('rdss-folder-mapper') && !c.includes('token'))).toBe(true);
+    expect(calls.some(c => c.includes('rdss-folder-mapper-token'))).toBe(true);
+  });
+
+  it('does nothing on Windows', () => {
+    vi.mocked(os.platform).mockReturnValue('win32');
+    const osInfo = { ...getOs(), isMac: false, isWindows: true, isLinux: false };
+
+    secrets.clearCredentialsFromKeychain(false, osInfo);
+
+    expect(childProcess.execSync).not.toHaveBeenCalled();
+  });
+});
+
 describe('saveTokenToKeychain – C1 shell injection regression', () => {
   beforeEach(() => {
     vi.clearAllMocks();

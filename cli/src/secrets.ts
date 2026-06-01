@@ -192,6 +192,17 @@ export const clearMacCredentials = (debug: boolean): void => {
   }
 };
 
+export const clearMacToken = (debug: boolean): void => {
+  try {
+    if (debug) signale.debug('Clearing OAuth token from macOS keychain...');
+    execSync('security delete-generic-password -s "rdss-folder-mapper-token"', {
+      stdio: debug ? 'pipe' : 'ignore',
+    });
+  } catch (e) {
+    if (debug) signale.debug('Failed to clear macOS token:', (e as Error).message);
+  }
+};
+
 export const clearLinuxCredentials = (debug: boolean): void => {
   try {
     if (debug) signale.debug('Clearing credentials from Linux secret-tool...');
@@ -203,11 +214,24 @@ export const clearLinuxCredentials = (debug: boolean): void => {
   }
 };
 
+export const clearLinuxToken = (debug: boolean): void => {
+  try {
+    if (debug) signale.debug('Clearing OAuth token from Linux secret-tool...');
+    execSync('secret-tool clear service rdss-folder-mapper-token', {
+      stdio: debug ? 'pipe' : 'ignore',
+    });
+  } catch (e) {
+    if (debug) signale.debug('Failed to clear Linux token:', (e as Error).message);
+  }
+};
+
 export const clearCredentialsFromKeychain = (debug: boolean, osInfo: OsInfo): void => {
   if (osInfo.isMac) {
     clearMacCredentials(debug);
+    clearMacToken(debug);
   } else if (!osInfo.isWindows) {
     clearLinuxCredentials(debug);
+    clearLinuxToken(debug);
   } else {
     if (debug) signale.debug('Keychain storage is not supported on Windows.');
   }
