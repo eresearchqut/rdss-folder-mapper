@@ -24,8 +24,9 @@ rdss-folder-mapper [options] [command]
 | `-V, --version` | — | Print the version number and exit. |
 | `-d, --debug` | `false` | Enable verbose debug logging. |
 | `-b, --base-dir <path>` | `~/Desktop/RDSS Folders` | Directory where folder shortcuts are created. |
-| `-r, --remote-path <path>` | Platform default | Network path to your institution's research storage. |
-| `--dmp-base-url <url>` | Institution default | Base URL of the Data Management Plan service. |
+| `-r, --remote-path <path>` | From `config.json` | Network path to your institution's research storage. |
+| `-f, --folders <path>` | `folders.json` | Custom path to a folders JSON file. |
+| `-t, --truncate <number>` | — | Truncate folder name display to this many characters. |
 | `--refresh` | — | Refresh mappings without removing existing ones first. |
 | `--force` | — | Re-create mappings even if they already exist. |
 
@@ -55,12 +56,6 @@ rdss-folder-mapper reset
 rdss-folder-mapper --debug
 ```
 
-**Use a custom DMP service URL:**
-
-```bash
-rdss-folder-mapper --dmp-base-url https://dmp.example.edu
-```
-
 **Save credentials to the keychain:**
 
 ```bash
@@ -69,9 +64,9 @@ rdss-folder-mapper auth
 
 ## Configuration
 
-All options can be set once via the Desktop GUI Settings panel — the CLI reads the same config file.
+CLI flags override values read from a `config.json` file placed in the working directory (next to the binary). This file is provided by your IT administrator and contains deployment-specific settings such as the remote storage path and OAuth credentials.
 
-Config is stored at:
+User preferences (base directory, debug mode) are stored separately by the Desktop GUI at:
 
 | Platform | Path |
 |----------|------|

@@ -37,13 +37,13 @@ The CLI is suitable for advanced users and automated workflows.
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/cli/download.sh | bash
+curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/download.sh | bash
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/cli/download.ps1 | iex
+irm https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/download.ps1 | iex
 ```
 
 ### npm (any platform)

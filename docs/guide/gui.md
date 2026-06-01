@@ -35,11 +35,13 @@ Click the **⚙** (gear) icon in the top-right corner to open the Settings panel
 | Setting | Description | Default |
 |---------|-------------|---------|
 | **Mappings folder** | Where folder shortcuts are created on your computer. | `~/Desktop/RDSS Folders` |
-| **Remote storage path** | The network path to your institution's research storage. | Provided by your IT department |
-| **DMP service URL** | The URL of the Data Management Plan service that provides your project list. | Provided by your institution |
 | **Debug logging** | Enables verbose output in the Activity log. | Off |
 
 Click **Save settings** to persist your changes. Settings are stored locally and remembered between sessions.
+
+::: info Deployment configuration
+Settings such as the remote storage path and authentication details are configured by your IT administrator in a `config.json` file placed alongside the application. Contact your IT department if folder mapping is not working.
+:::
 
 ## Troubleshooting
 
