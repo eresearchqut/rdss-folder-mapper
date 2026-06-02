@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "RDSS Folder Mapper"
   text: "Research storage on your Desktop"
-  tagline: Mount your institution's network research storage folders as regular desktop folders — no IT skills required.
+  tagline: Mount your RDSS folders as regular desktop folders with easy to read names.
   image:
     src: /screenshots/gui-main.png
     alt: RDSS Folder Mapper GUI
@@ -23,7 +23,7 @@ features:
 
   - icon: ⚙️
     title: Configurable
-    details: Customise the base directory, remote storage path and DMP service URL to match your institution's setup.
+    details: Customise the base directory.
 
   - icon: 💻
     title: Cross-platform
