@@ -2,20 +2,21 @@
 
 ## Desktop GUI (Recommended)
 
-Download the latest installer for your operating system from the [GitHub Releases](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest) page.
+Download the installer for your operating system directly:
 
-| Platform | File | Notes |
-|----------|------|-------|
-| **macOS (Apple Silicon)** | `rdss-folder-mapper-gui-mac-arm64.dmg` | M1 / M2 / M3 Macs |
-| **macOS (Intel)** | `rdss-folder-mapper-gui-mac-x64.dmg` | Intel-based Macs |
-| **Windows** | `rdss-folder-mapper-gui-win.exe` | Installs for current user, no admin required |
-| **Linux** | `rdss-folder-mapper-gui-linux.AppImage` | Make executable then run |
+| Platform | Download |
+|----------|----------|
+| **macOS** | [rdss-folder-mapper-gui-mac.dmg](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac.dmg) |
+| **Windows** | [rdss-folder-mapper-gui-win.exe](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-win.exe) |
+| **Linux** | [rdss-folder-mapper-gui-linux.AppImage](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-linux.AppImage) |
+
+All releases are also listed on the [GitHub Releases](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest) page.
 
 ### macOS
 
 1. Open the `.dmg` file.
 2. Drag **RDSS Folder Mapper** into your Applications folder.
-3. On first launch, macOS may show a security prompt — click **Open** to proceed.
+3. On first launch, macOS may show a security prompt — right-click the app and choose **Open** to proceed.
 
 ### Windows
 
@@ -33,6 +34,12 @@ chmod +x rdss-folder-mapper-gui-linux.AppImage
 ## Command-Line Interface (CLI)
 
 The CLI is suitable for advanced users and automated workflows.
+
+| Platform | Download |
+|----------|----------|
+| **macOS** | [rdss-folder-mapper-macos](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos) |
+| **Windows** | [rdss-folder-mapper-win.exe](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe) |
+| **Linux** | [rdss-folder-mapper-linux](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux) |
 
 ### macOS / Linux
 
