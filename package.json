@@ -19,5 +19,6 @@
   "devDependencies": {
     "puppeteer": "^22.0.0",
     "vitepress": "^1.6.3"
-  }
+  },
+  "version": "1.4.0"
 }
