@@ -181,7 +181,7 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
       }
     });
 
-    worker.on('error', (err) => {
+    worker.on('error', (err: Error) => {
       activeWorker = null;
       mainWindow?.webContents.send('log', `✗ ${err.message}`);
       resolve({ success: false, cancelled: cancelRequested });
