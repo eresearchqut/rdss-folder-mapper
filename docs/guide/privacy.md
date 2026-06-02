@@ -22,7 +22,7 @@ In some network configurations, mounting a research storage folder requires sepa
 
 If these are required, the app will display a **credentials dialog** before mounting. The dialog pre-fills your system username to save you time.
 
-![Credentials dialog — enter your network storage username and password]()
+![Credentials dialog — enter your network storage username and password](/screenshots/gui-credentials.png)
 
 ::: info When this prompt appears
 This prompt only appears when the storage server requires explicit credentials that your current session does not already provide. Many environments handle this automatically and this dialog will never appear.

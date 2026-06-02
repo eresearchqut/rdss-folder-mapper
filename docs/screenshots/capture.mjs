@@ -115,6 +115,19 @@ async function run() {
     );
     await capture(page3, 'gui-settings.png');
 
+    // ── 4. Credentials dialog ─────────────────────────────────────────────────
+    const page4 = await browser.newPage();
+    await page4.setViewport(VIEWPORT);
+    await page4.setContent(html, { waitUntil: 'networkidle0' });
+    await page4.waitForSelector('#modalCredentials');
+    await page4.evaluate(() => {
+      const modal = document.getElementById('modalCredentials');
+      const usernameField = document.getElementById('credUsername');
+      modal.classList.remove('hidden');
+      usernameField.value = 'jsmith';
+    });
+    await capture(page4, 'gui-credentials.png');
+
   } finally {
     await browser.close();
   }
