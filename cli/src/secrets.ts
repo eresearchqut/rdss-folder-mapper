@@ -236,3 +236,96 @@ export const clearCredentialsFromKeychain = (debug: boolean, osInfo: OsInfo): vo
     if (debug) signale.debug('Keychain storage is not supported on Windows.');
   }
 };
+
+// ─── Deployment config keychain ───────────────────────────────────────────────
+
+const DEPLOYMENT_SERVICE = 'rdss-folder-mapper-config';
+const DEPLOYMENT_ACCOUNT = 'deployment';
+
+/**
+ * Read the IT-provisioned deployment config JSON string from the OS keychain.
+ * Returns undefined when no entry exists or the platform is unsupported.
+ */
+export const getDeploymentConfigJson = (debug: boolean, osInfo: OsInfo): string | undefined => {
+  try {
+    if (osInfo.isMac) {
+      if (debug) signale.debug('Reading deployment config from macOS keychain…');
+      const json = execSync(
+        `security find-generic-password -s "${DEPLOYMENT_SERVICE}" -a "${DEPLOYMENT_ACCOUNT}" -w`,
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+      ).trim();
+      return json || undefined;
+    } else if (osInfo.isWindows) {
+      if (debug) signale.debug('Reading deployment config from Windows Credential Manager…');
+      const ps = [
+        `[Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]|Out-Null`,
+        `$v=New-Object Windows.Security.Credentials.PasswordVault`,
+        `$c=$v.Retrieve('${DEPLOYMENT_SERVICE}','${DEPLOYMENT_ACCOUNT}')`,
+        `$c.RetrievePassword()`,
+        `Write-Output $c.Password`,
+      ].join(';');
+      const json = execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      return json || undefined;
+    } else {
+      if (debug) signale.debug('Reading deployment config from Linux secret-tool…');
+      const json = execFileSync(
+        'secret-tool',
+        ['lookup', 'service', DEPLOYMENT_SERVICE, 'account', DEPLOYMENT_ACCOUNT],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+      ).trim();
+      return json || undefined;
+    }
+  } catch (e) {
+    if (debug) signale.debug('Deployment config not found in keychain:', (e as Error).message);
+    return undefined;
+  }
+};
+
+/**
+ * Store the deployment config JSON string in the OS keychain.
+ * Called by the provisioning script; not called by the app itself.
+ */
+export const saveDeploymentConfigJson = (json: string, debug: boolean, osInfo: OsInfo): void => {
+  try {
+    if (osInfo.isMac) {
+      if (debug) signale.debug('Saving deployment config to macOS keychain…');
+      execFileSync(
+        'security',
+        [
+          'add-generic-password',
+          '-s', DEPLOYMENT_SERVICE,
+          '-a', DEPLOYMENT_ACCOUNT,
+          '-w', json,
+          '-U', // update if exists
+        ],
+        { stdio: debug ? 'pipe' : 'ignore' },
+      );
+    } else if (osInfo.isWindows) {
+      if (debug) signale.debug('Saving deployment config to Windows Credential Manager…');
+      const escaped = json.replace(/'/g, "''");
+      const ps = [
+        `[Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]|Out-Null`,
+        `$v=New-Object Windows.Security.Credentials.PasswordVault`,
+        `try{$old=$v.Retrieve('${DEPLOYMENT_SERVICE}','${DEPLOYMENT_ACCOUNT}');$v.Remove($old)}catch{}`,
+        `$c=New-Object Windows.Security.Credentials.PasswordCredential('${DEPLOYMENT_SERVICE}','${DEPLOYMENT_ACCOUNT}','${escaped}')`,
+        `$v.Add($c)`,
+      ].join(';');
+      execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+        stdio: debug ? 'pipe' : 'ignore',
+      });
+    } else {
+      if (debug) signale.debug('Saving deployment config to Linux secret-tool…');
+      execFileSync(
+        'secret-tool',
+        ['store', '--label=RDSS Folder Mapper Config', 'service', DEPLOYMENT_SERVICE, 'account', DEPLOYMENT_ACCOUNT],
+        { input: json, stdio: ['pipe', debug ? 'pipe' : 'ignore', debug ? 'pipe' : 'ignore'] },
+      );
+    }
+  } catch (e) {
+    if (debug) signale.debug('Failed to save deployment config to keychain:', (e as Error).message);
+    throw e;
+  }
+};

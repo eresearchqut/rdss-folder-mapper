@@ -138,6 +138,8 @@
     }
     .location-chip:hover { background: var(--qut-light-blue); border-color: var(--qut-blue); }
     .location-chip.hidden { display: none; }
+    .location-chip.disabled { cursor: default; opacity: 0.45; pointer-events: none; }
+    .location-chip.disabled:hover { background: var(--qut-pale); border-color: var(--qut-light-blue); }
     .location-chip-icon { font-size: 14px; flex-shrink: 0; }
     .location-chip-path {
       font-size: 12px; font-weight: 500; color: var(--qut-navy);
@@ -414,6 +416,12 @@
     const refreshRemoveButton = () =>
       window.api.hasShortcuts().then(has => { btnRemove.classList.toggle('hidden', !has); });
 
+    const refreshLocationChip = () =>
+      window.api.hasShortcuts().then(has => {
+        locationChip.classList.toggle('disabled', !has);
+        locationChip.title = has ? 'Open folder location' : 'No folders mapped yet';
+      });
+
     // Populate version
     window.api.getVersion().then(v => { versionTag.textContent = `v${v}`; });
 
@@ -423,6 +431,7 @@
       locationPath.textContent = cfg.baseDir;
       locationChip.classList.remove('hidden');
       refreshRemoveButton();
+      refreshLocationChip();
     });
 
     btnActivityLog.addEventListener('click', () => window.api.openLogFile());
@@ -502,7 +511,9 @@
       panelSettings.classList.contains('hidden') ? showSettings() : showMain();
     });
 
-    locationChip.addEventListener('click', () => window.api.openBaseDir());
+    locationChip.addEventListener('click', () => {
+      if (!locationChip.classList.contains('disabled')) window.api.openBaseDir();
+    });
 
     btnCancel.addEventListener('click', showMain);
 
@@ -562,6 +573,7 @@
       }
       setBusy(false);
       refreshRemoveButton();
+      refreshLocationChip();
     });
 
     btnRemove.addEventListener('click', async () => {
@@ -578,6 +590,7 @@
       }
       setBusy(false);
       refreshRemoveButton();
+      refreshLocationChip();
     });
   </script>
 </body>

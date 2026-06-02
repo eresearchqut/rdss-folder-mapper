@@ -46,31 +46,60 @@ const loadConfig = (): Config => {
 };
 
 /**
- * Loads the deployment config.json (OAuth credentials, remote paths, etc.)
- * from a location relative to the app package.  In development this resolves
- * to the repository root; in a packaged build it sits next to the resources
- * directory.  Falls back to process.cwd() so CLI-style invocation also works.
+ * Returns the OS-appropriate path for the IT-provisioned system config file.
+ *   Windows : C:\ProgramData\RDSSFolderMapper\config.json
+ *   macOS   : /Library/Application Support/RDSSFolderMapper/config.json
+ *   Linux   : /etc/RDSSFolderMapper/config.json
+ */
+const systemDeploymentConfigPath = (): string => {
+  switch (process.platform) {
+    case 'win32':
+      return path.join(process.env.PROGRAMDATA ?? 'C:\\ProgramData', 'RDSSFolderMapper', 'config.json');
+    case 'darwin':
+      return '/Library/Application Support/RDSSFolderMapper/config.json';
+    default:
+      return '/etc/RDSSFolderMapper/config.json';
+  }
+};
+
+const parseDeploymentJson = (raw: string): DeploymentConfig => {
+  const parsed = JSON.parse(raw);
+  delete parsed.username;
+  delete parsed.password;
+  delete parsed.domain;
+  return parsed as DeploymentConfig;
+};
+
+/**
+ * Loads the deployment config, merging sources from lowest to highest priority:
+ *   1. System config file  (IT-provisioned via SCCM / Jamf / script)
+ *   2. Local config.json   (next to binary — developer / per-machine override)
  */
 const loadDeploymentConfig = (): DeploymentConfig => {
-  const candidates = [
-    // Development: app.getAppPath() = gui/ → parent is project root
+  // Base layer: system-managed config deployed by IT
+  let result: DeploymentConfig = {};
+  try {
+    const sysPath = systemDeploymentConfigPath();
+    if (fs.existsSync(sysPath)) {
+      result = parseDeploymentJson(fs.readFileSync(sysPath, 'utf8'));
+    }
+  } catch { /* ignore missing or malformed system config */ }
+
+  // Override layer: local config.json next to the binary (dev / machine-specific)
+  const localCandidates = [
     path.join(app.getAppPath(), '..', 'config.json'),
-    // Fallback: wherever the process was launched from
     path.join(process.cwd(), 'config.json'),
   ];
-  for (const candidate of candidates) {
+  for (const candidate of localCandidates) {
     if (fs.existsSync(candidate)) {
       try {
-        const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8'));
-        // Never propagate credentials from disk config
-        delete parsed.username;
-        delete parsed.password;
-        delete parsed.domain;
-        return parsed as DeploymentConfig;
+        result = { ...result, ...parseDeploymentJson(fs.readFileSync(candidate, 'utf8')) };
+        break;
       } catch { /* ignore parse errors */ }
     }
   }
-  return {};
+
+  return result;
 };
 
 const saveConfig = (config: Config): void => {

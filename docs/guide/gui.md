@@ -48,3 +48,9 @@ Settings such as the remote storage path and authentication details are configur
 - **"Error — see activity log"**: Expand the Activity log to see what went wrong. Common causes are network connectivity issues or an expired authentication session.
 - **Folders not appearing**: Ensure the base directory exists. If you changed it in Settings, create the folder manually first.
 - **macOS security warning on first launch**: Right-click the app and choose **Open**, then confirm.
+
+## Credentials & privacy
+
+The app signs you in via your institution's standard login page — it never sees your password. Network storage credentials (if required) are stored securely in your OS keychain and can be removed at any time via **Sign Out**.
+
+[→ Read the full Your Data & Privacy page](/guide/privacy)

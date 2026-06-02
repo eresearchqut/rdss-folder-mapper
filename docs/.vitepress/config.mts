@@ -30,6 +30,7 @@ export default defineConfig({
         items: [
           { text: 'Desktop GUI', link: '/guide/gui' },
           { text: 'Command Line (CLI)', link: '/guide/cli' },
+          { text: 'Your Data & Privacy', link: '/guide/privacy' },
         ],
       },
     ],
