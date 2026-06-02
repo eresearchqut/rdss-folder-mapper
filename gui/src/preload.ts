@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('api', {
 
   openLogFile: (): Promise<void> => ipcRenderer.invoke('open-log-file'),
   openBaseDir: (): Promise<void> => ipcRenderer.invoke('open-base-dir'),
+  openHelp: (): Promise<void> => ipcRenderer.invoke('open-help'),
 
   cancelOperation: (): Promise<void> => ipcRenderer.invoke('cancel-operation'),
 

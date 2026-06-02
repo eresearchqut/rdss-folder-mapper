@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: "RDSS Folder Mapper"
-  text: "Research storage on your Desktop"
+  text: "Your research folders, ready on your Desktop"
   tagline: Mount your RDSS folders as regular desktop folders with easy to read names.
   image:
     src: /screenshots/gui-main.png

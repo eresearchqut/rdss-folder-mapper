@@ -279,6 +279,8 @@
 
     <div class="bottom-bar">
       <span class="version-tag" id="versionTag"></span>
+      <button class="btn-activity-log" id="btnHelp" style="margin-left:10px;">Guide ↗</button>
+      <div style="flex:1"></div>
       <button class="btn-activity-log" id="btnActivityLog">Activity log ↗</button>
     </div>
   </div>
@@ -404,6 +406,7 @@
     const btnSignOut    = document.getElementById('btnSignOut');
     const versionTag    = document.getElementById('versionTag');
     const btnActivityLog = document.getElementById('btnActivityLog');
+    const btnHelp        = document.getElementById('btnHelp');
 
     const progressSection = document.getElementById('progressSection');
     const progressLabel   = document.getElementById('progressLabel');
@@ -435,6 +438,7 @@
     });
 
     btnActivityLog.addEventListener('click', () => window.api.openLogFile());
+    btnHelp.addEventListener('click', () => window.api.openHelp());
     statusLogLink.addEventListener('click', () => window.api.openLogFile());
 
     // Progress events

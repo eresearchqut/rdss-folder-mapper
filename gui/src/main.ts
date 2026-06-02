@@ -240,6 +240,10 @@ ipcMain.handle('open-base-dir', async () => {
   await shell.openPath(expanded);
 });
 
+ipcMain.handle('open-help', () => {
+  shell.openExternal('https://eresearchqut.github.io/rdss-folder-mapper');
+});
+
 /**
  * On macOS, accessing the Desktop folder requires user permission (TCC).
  * If the base directory is inaccessible, prompt the user via the native
