@@ -4,12 +4,14 @@ RDSS Folder Mapper is designed to be transparent about what information it acces
 
 ## When you may be asked to sign in
 
-### 1. Institutional login (browser-based)
+### 1. Data Management Planner login (browser-based)
 
-When you first click **Connect Research Folders**, your default web browser opens to your institution's login page. This is a standard OAuth sign-in — the same mechanism used by university portals, Microsoft 365, and other institutional services.
+When you first click **Connect Research Folders**, your default web browser opens to the **Data Management Planner** login page. This is a standard OAuth sign-in — the same mechanism used by university portals, Microsoft 365, and other institutional services.
+
+Once signed in, the app retrieves your approved research project details from the Data Management Planner — including the list of projects you have access to and your role on each — and uses this to determine which research storage folders to connect on your behalf.
 
 ::: tip The app never sees your institutional password
-Your credentials are entered directly into your institution's login page inside the browser. The app only receives a short-lived access token after you have successfully signed in — it never has access to your username or password.
+Your credentials are entered directly into the Data Management Planner login page inside the browser. The app only receives a short-lived access token after you have successfully signed in — it never has access to your username or password.
 :::
 
 After signing in, the browser may display a message like *"You can now close this tab"* — the app has received the token it needs and the browser window is no longer required.
