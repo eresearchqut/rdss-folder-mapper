@@ -20,6 +20,38 @@ const winSys32 = process.env.SystemRoot
 const psExe = `${winSys32}\\WindowsPowerShell\\v1.0\\powershell.exe`;
 const netExe = `${winSys32}\\net.exe`;
 
+/**
+ * Check whether a Windows network share is reachable using the current Windows
+ * session identity (Kerberos / integrated auth). When this returns true the
+ * share can be mapped without prompting for SMB credentials.
+ */
+export const isWindowsShareAccessible = (remotePath: string, debug = false): boolean => {
+  try {
+    const escaped = remotePath.replace(/'/g, "''");
+    const out = execFileSync(
+      psExe,
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `if(Test-Path -LiteralPath '${escaped}'){'YES'}else{'NO'}`,
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    );
+    const accessible = out.includes('YES');
+    if (debug) {
+      signale.debug(
+        accessible
+          ? `Share ${remotePath} is reachable with current Windows credentials.`
+          : `Share ${remotePath} is not reachable with current Windows credentials.`,
+      );
+    }
+    return accessible;
+  } catch {
+    return false;
+  }
+};
+
 
 
 

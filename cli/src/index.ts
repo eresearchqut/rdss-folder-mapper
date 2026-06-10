@@ -23,7 +23,7 @@ import {
 import { getOs, OsInfo } from './os';
 import { setupFetchMiddleware, performLogin } from './auth';
 import { loadFoldersConfig } from './config';
-import { processFolderMapping, setupBaseDirectory, reset, sanitizeErrorMessage } from './mount';
+import { processFolderMapping, setupBaseDirectory, reset, sanitizeErrorMessage, isWindowsShareAccessible } from './mount';
 
 // Export for tests and GUI
 export { transformPlansToFolders, performLogin };
@@ -69,6 +69,7 @@ interface RefreshOptions {
 const resolveCredentials = async (
   options: RefreshOptions,
   osInfo: OsInfo,
+  baseRemotePath?: string,
 ): Promise<Credentials> => {
   const keychainCreds = getCredentialsFromKeychain(options.debug || false, osInfo);
   let { username, password, adDomain } = keychainCreds;
@@ -78,6 +79,17 @@ const resolveCredentials = async (
     username = os.userInfo().username;
     if (options.debug)
       signale.info(`No username provided, defaulting to executing user: ${username}`);
+  }
+
+  // On Windows, shortcuts to a UNC share work with the user's existing Windows
+  // session identity (domain-joined / Kerberos). If the share is already
+  // reachable we skip prompting for SMB credentials entirely.
+  if (osInfo.isWindows && !username && !password && baseRemotePath) {
+    if (isWindowsShareAccessible(baseRemotePath, options.debug || false)) {
+      if (options.debug)
+        signale.debug('Share reachable with current Windows credentials; skipping credential prompt.');
+      return { username, password, adDomain };
+    }
   }
 
   if (!username && !password && options.onCredentialsRequired) {
@@ -118,8 +130,6 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
   signale.info('Refreshing drive mappings...');
   let credentials: Credentials | undefined;
   try {
-    credentials = await resolveCredentials(options, osInfo);
-
     if (options.force && fs.existsSync(foldersFile)) {
       if (debug) signale.debug(`Force option provided, removing existing ${foldersFile}`);
       fs.rmSync(foldersFile, { force: true });
@@ -216,6 +226,8 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         'No remote path configured. Set "remotePathNix" / "remotePathWin" in config.json, or use --remote-path.',
       );
     }
+
+    credentials = await resolveCredentials(options, osInfo, baseRemotePath);
 
     options.onEvent?.({ type: 'mount:start', total: folders.length });
     for (let i = 0; i < folders.length; i++) {
@@ -319,11 +331,6 @@ program
   .description('Set credentials in the keychain')
   .action(() => {
     const osInfo = getOs();
-    if (osInfo.isWindows) {
-      signale.error('Keychain storage is not supported on Windows.');
-      process.exit(1);
-    }
-
     const debug = program.opts().debug || false;
     const currentUser = os.userInfo().username;
     const usernameInput = readlineSync.question(
@@ -347,10 +354,6 @@ program
   .description('Clear all credentials from the keychain')
   .action(() => {
     const osInfo = getOs();
-    if (osInfo.isWindows) {
-      signale.error('Keychain storage is not supported on Windows.');
-      process.exit(1);
-    }
     const debug = program.opts().debug || false;
     clearCredentialsFromKeychain(debug, osInfo);
     signale.success('Successfully cleared credentials from keychain.');

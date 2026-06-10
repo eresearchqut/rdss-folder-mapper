@@ -13,6 +13,7 @@ import {
   mountMac,
   mountLinux,
   resetMountsDir,
+  isWindowsShareAccessible,
 } from './mount';
 import signale from 'signale';
 import { getOs } from './os';
@@ -52,6 +53,34 @@ describe('mount.ts unit tests', () => {
       (child_process.execSync as Mock).mockReturnValue('/dev/disk1s1 on /System/Volumes/Data (apfs, local, journaled)');
       expect(isMounted('/local', '/System/Volumes/Data', getOs())).toBe(true);
       expect(isMounted('/local', '/NonExistent', getOs())).toBe(false);
+    });
+  });
+
+  describe('isWindowsShareAccessible', () => {
+    it('returns true when Test-Path reports the share is reachable', () => {
+      (child_process.execFileSync as Mock).mockReturnValue('YES\n');
+      expect(isWindowsShareAccessible('\\\\server\\share')).toBe(true);
+      const call = (child_process.execFileSync as Mock).mock.calls[0];
+      expect(String(call[1].join(' '))).toContain('Test-Path');
+    });
+
+    it('returns false when Test-Path reports the share is not reachable', () => {
+      (child_process.execFileSync as Mock).mockReturnValue('NO\n');
+      expect(isWindowsShareAccessible('\\\\server\\share')).toBe(false);
+    });
+
+    it('returns false when the PowerShell invocation throws', () => {
+      (child_process.execFileSync as Mock).mockImplementation(() => {
+        throw new Error('access denied');
+      });
+      expect(isWindowsShareAccessible('\\\\server\\share')).toBe(false);
+    });
+
+    it('escapes single quotes in the remote path', () => {
+      (child_process.execFileSync as Mock).mockReturnValue('YES\n');
+      isWindowsShareAccessible("\\\\server\\o'brien");
+      const script = (child_process.execFileSync as Mock).mock.calls[0][1].join(' ');
+      expect(script).toContain("o''brien");
     });
   });
 

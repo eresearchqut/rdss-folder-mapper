@@ -116,7 +116,7 @@ rdss-folder-mapper reset
 
 ### Authentication
 
-Store credentials in the system keychain (macOS Keychain / Linux secret-tool):
+Store credentials in the system keychain (macOS Keychain / Windows Credential Manager / Linux secret-tool):
 
 ```bash
 rdss-folder-mapper auth

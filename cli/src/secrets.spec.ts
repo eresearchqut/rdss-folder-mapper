@@ -44,12 +44,18 @@ describe('clearCredentialsFromKeychain – clears both credentials and OAuth tok
     expect(calls.some(c => c.includes('rdss-folder-mapper-token'))).toBe(true);
   });
 
-  it('does nothing on Windows', () => {
+  it('clears the PasswordVault entry on Windows', () => {
     vi.mocked(os.platform).mockReturnValue('win32');
     const osInfo = { ...getOs(), isMac: false, isWindows: true, isLinux: false };
+    vi.mocked(childProcess.execFileSync).mockReturnValue(Buffer.from(''));
 
     secrets.clearCredentialsFromKeychain(false, osInfo);
 
+    const call = vi.mocked(childProcess.execFileSync).mock.calls[0];
+    expect(call[0]).toBe('powershell');
+    const script = (call[1] as string[]).join(' ');
+    expect(script).toContain('PasswordVault');
+    expect(script).toContain("FindAllByResource('rdss-folder-mapper')");
     expect(childProcess.execSync).not.toHaveBeenCalled();
   });
 });
@@ -101,13 +107,113 @@ describe('saveTokenToKeychain – C1 shell injection regression', () => {
     expect(childProcess.execSync).not.toHaveBeenCalled();
   });
 
-  it('does nothing on Windows', () => {
+  it('saves the token to the PasswordVault on Windows', () => {
     vi.mocked(os.platform).mockReturnValue('win32');
     const osInfo = { ...getOs(), isMac: false, isWindows: true, isLinux: false };
+    vi.mocked(childProcess.execFileSync).mockReturnValue(Buffer.from(''));
 
     secrets.saveTokenToKeychain('windows-token', false, osInfo);
 
-    expect(childProcess.execFileSync).not.toHaveBeenCalled();
+    const call = vi.mocked(childProcess.execFileSync).mock.calls[0];
+    expect(call[0]).toBe('powershell');
+    const script = (call[1] as string[]).join(' ');
+    expect(script).toContain('PasswordCredential');
+    expect(script).toContain("'rdss-folder-mapper-token'");
+    expect(script).toContain('windows-token');
     expect(childProcess.execSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('Windows credential storage – PasswordVault', () => {
+  const winOs = () => {
+    vi.mocked(os.platform).mockReturnValue('win32');
+    return { ...getOs(), isMac: false, isWindows: true, isLinux: false };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('saves credentials to the PasswordVault with the domain encoded into the username', () => {
+    const osInfo = winOs();
+    vi.mocked(childProcess.execFileSync).mockReturnValue(Buffer.from(''));
+
+    secrets.saveCredentialsToKeychain(
+      { username: 'alice', password: 'pw', adDomain: 'QUT' },
+      false,
+      osInfo,
+    );
+
+    const call = vi.mocked(childProcess.execFileSync).mock.calls[0];
+    expect(call[0]).toBe('powershell');
+    const script = (call[1] as string[]).join(' ');
+    expect(script).toContain('PasswordCredential');
+    expect(script).toContain("'rdss-folder-mapper'");
+    expect(script).toContain('QUT\\alice');
+    expect(childProcess.execSync).not.toHaveBeenCalled();
+  });
+
+  it('escapes single quotes in the password to prevent PowerShell injection', () => {
+    const osInfo = winOs();
+    vi.mocked(childProcess.execFileSync).mockReturnValue(Buffer.from(''));
+
+    secrets.saveCredentialsToKeychain(
+      { username: 'alice', password: "p');$x='owned" },
+      false,
+      osInfo,
+    );
+
+    const script = (vi.mocked(childProcess.execFileSync).mock.calls[0][1] as string[]).join(' ');
+    expect(script).toContain("p'');$x=''owned");
+  });
+
+  it('reads and parses credentials (domain\\user) from the PasswordVault', () => {
+    const osInfo = winOs();
+    vi.mocked(childProcess.execFileSync).mockReturnValue('QUT\\alice\nsecretpw\n' as unknown as Buffer);
+
+    const creds = secrets.getCredentialsFromKeychain(false, osInfo);
+
+    expect(creds).toEqual({ username: 'alice', password: 'secretpw', adDomain: 'QUT' });
+  });
+
+  it('returns empty credentials when the PasswordVault has no entry', () => {
+    const osInfo = winOs();
+    vi.mocked(childProcess.execFileSync).mockImplementation(() => {
+      throw new Error('Element not found');
+    });
+
+    expect(secrets.getCredentialsFromKeychain(false, osInfo)).toEqual({});
+  });
+
+  it('reads the OAuth token from the PasswordVault', () => {
+    const osInfo = winOs();
+    vi.mocked(childProcess.execFileSync).mockReturnValue('jwt-token-value\n' as unknown as Buffer);
+
+    expect(secrets.getTokenFromKeychain(false, osInfo)).toBe('jwt-token-value');
+    const script = (vi.mocked(childProcess.execFileSync).mock.calls[0][1] as string[]).join(' ');
+    expect(script).toContain("'rdss-folder-mapper-token'");
+    expect(script).toContain("'oauth_token'");
+  });
+
+  it('returns undefined for the token when the PasswordVault has no entry', () => {
+    const osInfo = winOs();
+    vi.mocked(childProcess.execFileSync).mockImplementation(() => {
+      throw new Error('Element not found');
+    });
+
+    expect(secrets.getTokenFromKeychain(false, osInfo)).toBeUndefined();
+  });
+
+  it('clears both the credentials and the OAuth token on Windows', () => {
+    const osInfo = winOs();
+    vi.mocked(childProcess.execFileSync).mockReturnValue(Buffer.from(''));
+
+    secrets.clearCredentialsFromKeychain(false, osInfo);
+
+    const scripts = vi
+      .mocked(childProcess.execFileSync)
+      .mock.calls.map((c) => (c[1] as string[]).join(' '));
+    expect(scripts.some((s) => s.includes("FindAllByResource('rdss-folder-mapper')"))).toBe(true);
+    expect(scripts.some((s) => s.includes("FindAllByResource('rdss-folder-mapper-token')"))).toBe(true);
   });
 });

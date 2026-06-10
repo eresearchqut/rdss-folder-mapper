@@ -2,7 +2,7 @@ import type { MockInstance } from 'vitest';
 import signale from 'signale';
 import http from 'http';
 import os from 'os';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import { performLogin, redactHeaders, setupFetchMiddleware } from './auth';
 import { getOs } from './os';
 
@@ -59,8 +59,10 @@ describe('auth performLogin', () => {
     );
   });
 
-  it('should skip keychain on Windows and start login process', async () => {
+  it('persists the token via the Windows Credential Manager after login', async () => {
     vi.mocked(os.platform).mockReturnValue('win32');
+    // No existing token in the vault — PasswordVault read returns nothing.
+    vi.mocked(execFileSync).mockReturnValue(undefined as never);
 
     const errorSpy = vi.spyOn(signale, 'error').mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
@@ -85,11 +87,21 @@ describe('auth performLogin', () => {
     });
 
     const token = await loginPromise;
+    expect(token).toBe('windows_token');
+    // The macOS `security` command is never used on Windows.
     expect(execSync).not.toHaveBeenCalledWith(
       expect.stringContaining('security find-generic-password'),
       expect.any(Object),
     );
-    expect(token).toBe('windows_token');
+    // The token is saved through PowerShell PasswordVault.
+    const savedToVault = vi
+      .mocked(execFileSync)
+      .mock.calls.some(
+        (c) =>
+          c[0] === 'powershell' &&
+          (c[1] as string[]).join(' ').includes('windows_token'),
+      );
+    expect(savedToVault).toBe(true);
 
     errorSpy.mockRestore();
     exitSpy.mockRestore();

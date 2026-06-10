@@ -64,7 +64,7 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
 
   setupFetchMiddleware(debug);
 
-  if (!osInfo.isWindows && !force) {
+  if (!force) {
     const existingToken = getTokenFromKeychain(debug, osInfo);
     if (existingToken) {
       try {
@@ -186,9 +186,7 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
 
                 const tokenData = (await response.json()) as { id_token?: string };
                 if (tokenData.id_token) {
-                  if (!osInfo.isWindows) {
-                    saveTokenToKeychain(tokenData.id_token, debug, osInfo);
-                  }
+                  saveTokenToKeychain(tokenData.id_token, debug, osInfo);
                   signale.success('Successfully logged in and saved token.');
                   onEvent?.({ type: 'auth:complete' });
                   server.close(() => resolve(tokenData.id_token));

@@ -25,13 +25,8 @@ export const getMacCredentials = (debug: boolean): Credentials => {
     const password = stderr.trim();
     if (accountMatch && password) {
       if (debug) signale.debug('Credentials successfully retrieved from macOS keychain.');
-      let username = accountMatch[1];
-      let adDomain = domainMatch ? domainMatch[1] : undefined;
-      if (!adDomain && username.includes('\\')) {
-        const parts = username.split('\\');
-        adDomain = parts[0];
-        username = parts[1];
-      }
+      const domainHint = domainMatch ? domainMatch[1] : undefined;
+      const { username, adDomain } = splitDomainFromUsername(accountMatch[1], domainHint);
       return { username, password, adDomain };
     }
   } catch (e) {
@@ -55,17 +50,56 @@ export const getLinuxCredentials = (debug: boolean): Credentials => {
     }).trim();
     if (accountMatch && password) {
       if (debug) signale.debug('Credentials successfully retrieved from Linux secret-tool.');
-      let username = accountMatch[1].trim();
-      let adDomain = domainMatch ? domainMatch[1].trim() : undefined;
-      if (!adDomain && username.includes('\\')) {
-        const parts = username.split('\\');
-        adDomain = parts[0];
-        username = parts[1];
-      }
+      const domainHint = domainMatch ? domainMatch[1].trim() : undefined;
+      const { username, adDomain } = splitDomainFromUsername(accountMatch[1].trim(), domainHint);
       return { username, password, adDomain };
     }
   } catch (e) {
     if (debug) signale.debug('Failed to read from Linux secret-tool:', (e as Error).message);
+  }
+  return {};
+};
+
+const CREDENTIAL_RESOURCE = 'rdss-folder-mapper';
+const TOKEN_RESOURCE = 'rdss-folder-mapper-token';
+const TOKEN_ACCOUNT = 'oauth_token';
+
+const splitDomainFromUsername = (
+  username: string,
+  adDomain?: string,
+): { username: string; adDomain?: string } => {
+  if (!adDomain && username.includes('\\')) {
+    const [domainPart, ...rest] = username.split('\\');
+    return { username: rest.join('\\'), adDomain: domainPart };
+  }
+  return { username, adDomain };
+};
+
+export const getWindowsCredentials = (debug: boolean): Credentials => {
+  try {
+    if (debug) signale.debug('Reading credentials from Windows Credential Manager...');
+    const ps = [
+      `[Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]|Out-Null`,
+      `$v=New-Object Windows.Security.Credentials.PasswordVault`,
+      `$c=$v.FindAllByResource('${CREDENTIAL_RESOURCE}')[0]`,
+      `$c.RetrievePassword()`,
+      `Write-Output $c.UserName`,
+      `Write-Output $c.Password`,
+    ].join(';');
+    const out = execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const lines = out.split(/\r?\n/);
+    const rawUsername = (lines[0] || '').trim();
+    const password = lines.slice(1).join('\n').trim();
+    if (rawUsername && password) {
+      if (debug) signale.debug('Credentials successfully retrieved from Windows Credential Manager.');
+      const { username, adDomain } = splitDomainFromUsername(rawUsername);
+      return { username, password, adDomain };
+    }
+  } catch (e) {
+    if (debug) signale.debug('Failed to read from Windows Credential Manager:', (e as Error).message);
   }
   return {};
 };
@@ -76,10 +110,10 @@ export const getCredentialsFromKeychain = (
 ): Credentials => {
   if (osInfo.isMac) {
     return getMacCredentials(debug);
-  } else if (!osInfo.isWindows) {
-    return getLinuxCredentials(debug);
+  } else if (osInfo.isWindows) {
+    return getWindowsCredentials(debug);
   }
-  return {};
+  return getLinuxCredentials(debug);
 };
 
 export const saveMacCredentials = (
@@ -121,6 +155,33 @@ export const saveLinuxCredentials = (
   }
 };
 
+export const saveWindowsCredentials = (creds: Credentials, debug: boolean): void => {
+  try {
+    if (debug) signale.debug('Saving credentials to Windows Credential Manager...');
+    const userName = creds.adDomain ? `${creds.adDomain}\\${creds.username ?? ''}` : creds.username ?? '';
+    // Single-quoted PowerShell literals are injection-safe once embedded single
+    // quotes are doubled; no other metacharacters are interpreted.
+    const escUser = userName.replace(/'/g, "''");
+    const escPass = (creds.password ?? '').replace(/'/g, "''");
+    const ps = [
+      `[Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]|Out-Null`,
+      `$v=New-Object Windows.Security.Credentials.PasswordVault`,
+      `try{$v.FindAllByResource('${CREDENTIAL_RESOURCE}')|%{$v.Remove($_)}}catch{}`,
+      `$c=New-Object Windows.Security.Credentials.PasswordCredential('${CREDENTIAL_RESOURCE}','${escUser}','${escPass}')`,
+      `$v.Add($c)`,
+    ].join(';');
+    execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      stdio: debug ? 'pipe' : 'ignore',
+    });
+  } catch (e) {
+    let msg = (e as Error).message;
+    if (creds.password) {
+      msg = msg.split(creds.password).join('***');
+    }
+    if (debug) signale.debug('Failed to save to Windows Credential Manager:', msg);
+  }
+};
+
 export const saveCredentialsToKeychain = (
   creds: Credentials,
   debug: boolean,
@@ -128,10 +189,56 @@ export const saveCredentialsToKeychain = (
 ): void => {
   if (osInfo.isMac) {
     saveMacCredentials(creds, debug);
-  } else if (!osInfo.isWindows) {
-    saveLinuxCredentials(creds, debug);
+  } else if (osInfo.isWindows) {
+    saveWindowsCredentials(creds, debug);
   } else {
-    if (debug) signale.debug('Keychain storage is not supported on Windows.');
+    saveLinuxCredentials(creds, debug);
+  }
+};
+
+export const getWindowsToken = (debug: boolean): string | undefined => {
+  try {
+    if (debug) signale.debug('Reading OAuth token from Windows Credential Manager...');
+    const ps = [
+      `[Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]|Out-Null`,
+      `$v=New-Object Windows.Security.Credentials.PasswordVault`,
+      `$c=$v.Retrieve('${TOKEN_RESOURCE}','${TOKEN_ACCOUNT}')`,
+      `$c.RetrievePassword()`,
+      `Write-Output $c.Password`,
+    ].join(';');
+    const token = execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return token || undefined;
+  } catch (e) {
+    if (debug) signale.debug('Failed to read token from Windows Credential Manager:', (e as Error).message);
+    return undefined;
+  }
+};
+
+export const saveWindowsToken = (token: string, debug: boolean): void => {
+  try {
+    if (debug) signale.debug('Saving OAuth token to Windows Credential Manager...');
+    // Single-quoted PowerShell literals are injection-safe once embedded single
+    // quotes are doubled; no other metacharacters are interpreted.
+    const escToken = token.replace(/'/g, "''");
+    const ps = [
+      `[Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]|Out-Null`,
+      `$v=New-Object Windows.Security.Credentials.PasswordVault`,
+      `try{$v.FindAllByResource('${TOKEN_RESOURCE}')|%{$v.Remove($_)}}catch{}`,
+      `$c=New-Object Windows.Security.Credentials.PasswordCredential('${TOKEN_RESOURCE}','${TOKEN_ACCOUNT}','${escToken}')`,
+      `$v.Add($c)`,
+    ].join(';');
+    execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      stdio: debug ? 'pipe' : 'ignore',
+    });
+  } catch (e) {
+    let msg = (e as Error).message;
+    if (token) {
+      msg = msg.split(token).join('***');
+    }
+    if (debug) signale.debug('Failed to save token to Windows Credential Manager:', msg);
   }
 };
 
@@ -143,7 +250,9 @@ export const getTokenFromKeychain = (debug: boolean, osInfo: OsInfo): string | u
         stdio: ['ignore', 'pipe', 'ignore'],
       });
       return stdout.trim();
-    } else if (!osInfo.isWindows) {
+    } else if (osInfo.isWindows) {
+      return getWindowsToken(debug);
+    } else {
       const password = execSync('secret-tool lookup service rdss-folder-mapper-token', {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
@@ -165,7 +274,9 @@ export const saveTokenToKeychain = (token: string, debug: boolean, osInfo: OsInf
         ['add-generic-password', '-s', 'rdss-folder-mapper-token', '-a', 'oauth_token', '-w', token, '-U'],
         { stdio: debug ? 'pipe' : 'ignore' },
       );
-    } else if (!osInfo.isWindows) {
+    } else if (osInfo.isWindows) {
+      saveWindowsToken(token, debug);
+    } else {
       // Token is passed via stdin, not as a shell argument, to avoid any injection.
       execFileSync(
         'secret-tool',
@@ -225,15 +336,48 @@ export const clearLinuxToken = (debug: boolean): void => {
   }
 };
 
+export const clearWindowsCredentials = (debug: boolean): void => {
+  try {
+    if (debug) signale.debug('Clearing credentials from Windows Credential Manager...');
+    const ps = [
+      `[Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]|Out-Null`,
+      `$v=New-Object Windows.Security.Credentials.PasswordVault`,
+      `try{$v.FindAllByResource('${CREDENTIAL_RESOURCE}')|%{$v.Remove($_)}}catch{}`,
+    ].join(';');
+    execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      stdio: debug ? 'pipe' : 'ignore',
+    });
+  } catch (e) {
+    if (debug) signale.debug('Failed to clear Windows Credential Manager:', (e as Error).message);
+  }
+};
+
+export const clearWindowsToken = (debug: boolean): void => {
+  try {
+    if (debug) signale.debug('Clearing OAuth token from Windows Credential Manager...');
+    const ps = [
+      `[Windows.Security.Credentials.PasswordVault,Windows.Security.Credentials,ContentType=WindowsRuntime]|Out-Null`,
+      `$v=New-Object Windows.Security.Credentials.PasswordVault`,
+      `try{$v.FindAllByResource('${TOKEN_RESOURCE}')|%{$v.Remove($_)}}catch{}`,
+    ].join(';');
+    execFileSync('powershell', ['-NoProfile', '-Command', ps], {
+      stdio: debug ? 'pipe' : 'ignore',
+    });
+  } catch (e) {
+    if (debug) signale.debug('Failed to clear Windows token:', (e as Error).message);
+  }
+};
+
 export const clearCredentialsFromKeychain = (debug: boolean, osInfo: OsInfo): void => {
   if (osInfo.isMac) {
     clearMacCredentials(debug);
     clearMacToken(debug);
-  } else if (!osInfo.isWindows) {
+  } else if (osInfo.isWindows) {
+    clearWindowsCredentials(debug);
+    clearWindowsToken(debug);
+  } else {
     clearLinuxCredentials(debug);
     clearLinuxToken(debug);
-  } else {
-    if (debug) signale.debug('Keychain storage is not supported on Windows.');
   }
 };
 

@@ -23,7 +23,7 @@ describe('Mount Integration Test', () => {
         { source: usersConfPath, target: '/etc/samba/users.conf' },
       ])
       .withExposedPorts(445)
-      .withWaitStrategy(Wait.forLogMessage(/smbd version/i))
+      .withWaitStrategy(Wait.forListeningPorts())
       .start();
 
     // Create test files and set permissions for home directories
