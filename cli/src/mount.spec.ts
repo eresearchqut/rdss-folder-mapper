@@ -17,7 +17,7 @@ import {
 } from './mount';
 import signale from 'signale';
 import { getOs } from './os';
-import type { Mock } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, test, vi, type Mock } from 'vitest';
 
 vi.mock('fs');
 vi.mock('os');

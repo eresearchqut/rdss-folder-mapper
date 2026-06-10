@@ -1,3 +1,4 @@
+import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, test } from 'vitest';
 import { GenericContainer, Wait, StartedTestContainer } from 'testcontainers';
 import net from 'net';
 import fs from 'fs';

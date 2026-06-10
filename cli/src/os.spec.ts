@@ -1,6 +1,6 @@
 import { getOs, OS } from './os';
 import os from 'os';
-import type { MockInstance } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 describe('os.ts', () => {
   let platformSpy: MockInstance;

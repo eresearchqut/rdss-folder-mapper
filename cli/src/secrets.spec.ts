@@ -2,6 +2,7 @@ import * as childProcess from 'child_process';
 import * as secrets from './secrets';
 import { getOs } from './os';
 import os from 'os';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('child_process');
 vi.mock('os');
@@ -169,7 +170,7 @@ describe('Windows credential storage – PasswordVault', () => {
 
   it('reads and parses credentials (domain\\user) from the PasswordVault', () => {
     const osInfo = winOs();
-    vi.mocked(childProcess.execFileSync).mockReturnValue('QUT\\alice\nsecretpw\n' as unknown as Buffer);
+    vi.mocked(childProcess.execFileSync).mockReturnValue('QUT\\alice\nsecretpw\n');
 
     const creds = secrets.getCredentialsFromKeychain(false, osInfo);
 
@@ -187,7 +188,7 @@ describe('Windows credential storage – PasswordVault', () => {
 
   it('reads the OAuth token from the PasswordVault', () => {
     const osInfo = winOs();
-    vi.mocked(childProcess.execFileSync).mockReturnValue('jwt-token-value\n' as unknown as Buffer);
+    vi.mocked(childProcess.execFileSync).mockReturnValue('jwt-token-value\n');
 
     expect(secrets.getTokenFromKeychain(false, osInfo)).toBe('jwt-token-value');
     const script = (vi.mocked(childProcess.execFileSync).mock.calls[0][1] as string[]).join(' ');

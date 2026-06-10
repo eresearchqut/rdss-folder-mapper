@@ -1,3 +1,4 @@
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { loadFoldersConfig } from './config';
 
 // ─── loadFoldersConfig ────────────────────────────────────────────────────────
