@@ -126,6 +126,29 @@ fn system_deployment_config() -> PathBuf {
     }
 }
 
+/// In a `tauri dev` run, resolve the developer's local `config.json` the same
+/// way the old Electron app did (it read `process.cwd()/config.json` when
+/// launched from the repo root). The dev binary's cwd is not the repo root, so
+/// we also resolve the repo root deterministically via `CARGO_MANIFEST_DIR`
+/// (`gui/src-tauri` → repo root). This is compiled out of release builds.
+fn dev_deployment_config() -> Option<PathBuf> {
+    if !cfg!(debug_assertions) {
+        return None;
+    }
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.join("config.json"));
+    if let Some(p) = repo_root {
+        candidates.push(p);
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("config.json"));
+    }
+    candidates.into_iter().find(|p| p.exists())
+}
+
 /// Resolves the deployment config (apiUrl/clientId/remotePath/…) at runtime.
 ///
 /// NOTE: the deployment config is intentionally NOT bundled with the app and
@@ -134,6 +157,7 @@ fn system_deployment_config() -> PathBuf {
 /// are provisioned per deployment. Resolution order:
 ///   1. IT-provisioned system config (SCCM / Jamf / install script)
 ///   2. A developer override dropped in the app config dir (git-ignored)
+///   3. (dev builds only) the repo-root / cwd `config.json`
 fn read_deployment_config(app: &AppHandle) -> Option<String> {
     let system = system_deployment_config();
     if system.exists() {
@@ -147,6 +171,11 @@ fn read_deployment_config(app: &AppHandle) -> Option<String> {
             if let Ok(raw) = fs::read_to_string(&dev) {
                 return Some(raw);
             }
+        }
+    }
+    if let Some(local) = dev_deployment_config() {
+        if let Ok(raw) = fs::read_to_string(&local) {
+            return Some(raw);
         }
     }
     None
