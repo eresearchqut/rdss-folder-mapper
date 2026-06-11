@@ -10,7 +10,7 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tokio::sync::oneshot;
 
-const SIDECAR: &str = "binaries/rdss-folder-mapper";
+const SIDECAR: &str = "rdss-folder-mapper";
 const HELP_URL: &str = "https://eresearchqut.github.io/rdss-folder-mapper";
 
 // ─── Shared state ──────────────────────────────────────────────────────────────

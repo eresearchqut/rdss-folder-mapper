@@ -48,10 +48,25 @@ if (isArm64 && sourceName === `${base}${ext}`) {
 }
 
 const source = path.join(cliDist, sourceName);
+
+// 1. Triple-suffixed copy in binaries/ — this is what the Tauri bundler reads
+//    (externalBin) when producing release bundles.
 const binDir = path.resolve(__dirname, 'src-tauri/binaries');
 fs.mkdirSync(binDir, { recursive: true });
 const dest = path.join(binDir, `rdss-folder-mapper-${triple}${ext}`);
 fs.copyFileSync(source, dest);
 if (process.platform !== 'win32') fs.chmodSync(dest, 0o755);
-
 console.log(`Sidecar ready: ${path.relative(process.cwd(), dest)}`);
+
+// 2. Plain-named copy next to the dev/release executables. At runtime the
+//    shell plugin resolves the sidecar relative to the running binary's
+//    directory, and `tauri dev`/`cargo run` do not stage externalBin there.
+//    Without this, the sidecar spawn fails with "No such file or directory".
+for (const profile of ['debug', 'release']) {
+  const profileDir = path.resolve(__dirname, 'src-tauri/target', profile);
+  fs.mkdirSync(profileDir, { recursive: true });
+  const runDest = path.join(profileDir, `rdss-folder-mapper${ext}`);
+  fs.copyFileSync(source, runDest);
+  if (process.platform !== 'win32') fs.chmodSync(runDest, 0o755);
+  console.log(`Sidecar ready: ${path.relative(process.cwd(), runDest)}`);
+}
