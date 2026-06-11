@@ -8,9 +8,17 @@
     "typecheck": "tsc --noEmit",
     "build": "node build.js",
     "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "sidecar": "node copy-sidecar.js",
+    "tauri": "tauri",
+    "tauri:dev": "npm run sidecar && tauri dev",
+    "tauri:build": "tauri build"
   },
   "devDependencies": {
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/cli": "^2.11.2",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-shell": "^2.3.5",
     "@types/node": "^25.9.1",
     "electron": "42.3.0",
     "electron-builder": "^26.8.1",
