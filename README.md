@@ -31,7 +31,8 @@ Download the installer for your platform from the [latest release](https://githu
 | Platform | Download |
 |---|---|
 | 🪟 Windows | [`rdss-folder-mapper-gui-win.exe`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-win.exe) |
-| 🍎 macOS (Apple Silicon) | [`rdss-folder-mapper-gui-mac.dmg`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac.dmg) |
+| 🍎 macOS (Apple Silicon) | [`rdss-folder-mapper-gui-mac-arm64.dmg`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac-arm64.dmg) |
+| 🍎 macOS (Intel) | [`rdss-folder-mapper-gui-mac-x64.dmg`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac-x64.dmg) |
 | 🐧 Linux | [`rdss-folder-mapper-gui-linux.AppImage`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-linux.AppImage) |
 
 > **macOS note:** If macOS blocks the app on first launch, right-click the `.dmg` and choose **Open**, then click **Open** in the dialog.
