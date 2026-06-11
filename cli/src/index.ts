@@ -46,6 +46,17 @@ export type RefreshEvent =
 export const DMP_BASE_URL = process.env.DMP_BASE_URL;
 export const BASE_DIR = path.join(os.homedir(), 'Desktop', 'RDSS Folders');
 
+// When launched as the GUI sidecar (RDSS_JSON_EVENTS=1), structured progress and
+// lifecycle events are written to stdout as sentinel-prefixed JSON lines so the
+// Tauri backend can forward them to the renderer as `progress`/`event` emissions.
+const SIDECAR_EVENT_SENTINEL = '@@RDSS_EVENT@@';
+const guiEventsEnabled = process.env.RDSS_JSON_EVENTS === '1';
+
+const emitSidecarEvent = (channel: 'progress' | 'event', payload: unknown): void => {
+  if (!guiEventsEnabled) return;
+  process.stdout.write(`${SIDECAR_EVENT_SENTINEL}${JSON.stringify({ channel, payload })}\n`);
+};
+
 
 interface RefreshOptions {
   debug?: boolean;
@@ -307,6 +318,10 @@ program
       authDomain: configOptions.authDomain,
       callbackUrls: configOptions.callbackUrls,
       force: options.force,
+      onProgress: guiEventsEnabled
+        ? (current, total, folderName) => emitSidecarEvent('progress', { current, total, folderName })
+        : undefined,
+      onEvent: guiEventsEnabled ? (event) => emitSidecarEvent('event', event) : undefined,
     };
 
     if (finalOptions.debug) {

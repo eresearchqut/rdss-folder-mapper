@@ -12,6 +12,7 @@ use tokio::sync::oneshot;
 
 const SIDECAR: &str = "rdss-folder-mapper";
 const HELP_URL: &str = "https://eresearchqut.github.io/rdss-folder-mapper";
+const EVENT_SENTINEL: &str = "@@RDSS_EVENT@@";
 
 // ─── Shared state ──────────────────────────────────────────────────────────────
 
@@ -228,7 +229,12 @@ async fn run_sidecar(
         }
     };
 
-    let (mut rx, mut child) = match sidecar.current_dir(workdir).args(args).spawn() {
+    let (mut rx, mut child) = match sidecar
+        .env("RDSS_JSON_EVENTS", "1")
+        .current_dir(workdir)
+        .args(args)
+        .spawn()
+    {
         Ok(v) => v,
         Err(e) => {
             emit_log(app, &format!("✗ {e}"));
@@ -250,7 +256,14 @@ async fn run_sidecar(
             CommandEvent::Stdout(bytes) | CommandEvent::Stderr(bytes) => {
                 let line = strip_ansi(&String::from_utf8_lossy(&bytes));
                 let line = line.trim_end();
-                if !line.is_empty() {
+                if line.is_empty() {
+                    continue;
+                }
+                // Structured progress/lifecycle events are forwarded straight to
+                // the renderer; everything else is shown in the activity log.
+                if let Some(json) = line.strip_prefix(EVENT_SENTINEL) {
+                    forward_sidecar_event(app, json);
+                } else {
                     emit_log(app, line);
                 }
             }
@@ -264,6 +277,17 @@ async fn run_sidecar(
 
     *app.state::<AppState>().child.lock().unwrap() = None;
     success
+}
+
+/// Parses a `{"channel","payload"}` JSON line emitted by the CLI sidecar and
+/// re-emits the payload to the renderer on the given channel (`progress`/`event`).
+fn forward_sidecar_event(app: &AppHandle, json: &str) {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(json) {
+        if let Some(channel) = value.get("channel").and_then(|c| c.as_str()) {
+            let payload = value.get("payload").cloned().unwrap_or(serde_json::Value::Null);
+            let _ = app.emit(channel, payload);
+        }
+    }
 }
 
 // ─── Commands ────────────────────────────────────────────────────────────────
