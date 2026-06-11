@@ -150,6 +150,26 @@ fn dev_deployment_config() -> Option<PathBuf> {
     candidates.into_iter().find(|p| p.exists())
 }
 
+/// Heuristic to distinguish a real deployment config from an unrelated
+/// `config.json` (e.g. a legacy Electron GUI settings file containing only
+/// `debug`/`baseDir`) that may already live in the app config dir after an
+/// upgrade. Such a file must not shadow the IT-provisioned system config.
+fn looks_like_deployment_config(raw: &str) -> bool {
+    const KEYS: [&str; 6] = [
+        "apiUrl",
+        "clientId",
+        "authDomain",
+        "callbackUrls",
+        "remotePath",
+        "remotePathNix",
+    ];
+    serde_json::from_str::<serde_json::Value>(raw)
+        .ok()
+        .and_then(|v| v.as_object().cloned())
+        .map(|o| KEYS.iter().any(|k| o.contains_key(*k)) || o.contains_key("remotePathWin"))
+        .unwrap_or(false)
+}
+
 /// Resolves the deployment config (apiUrl/clientId/remotePath/…) at runtime.
 ///
 /// NOTE: the deployment config is intentionally NOT bundled with the app and
@@ -170,7 +190,11 @@ fn read_deployment_config(app: &AppHandle) -> Option<String> {
         let dev = dir.join("config.json");
         if dev.exists() {
             if let Ok(raw) = fs::read_to_string(&dev) {
-                return Some(raw);
+                // Only treat it as an override when it actually holds deployment
+                // keys, so a legacy/settings file can't shadow the system config.
+                if looks_like_deployment_config(&raw) {
+                    return Some(raw);
+                }
             }
         }
     }
@@ -446,8 +470,12 @@ async fn map_folders(app: AppHandle) -> OpResult {
                     creds.password.clone(),
                     creds.ad_domain.clone().unwrap_or_default(),
                 ];
-                run_sidecar(&app, auth_args, &workdir, Some(stdin)).await;
-                let _ = fs::write(&marker, "1");
+                let auth_ok = run_sidecar(&app, auth_args, &workdir, Some(stdin)).await;
+                // Only suppress future prompts if credentials were actually
+                // saved; if `auth` failed or was cancelled, prompt again next run.
+                if auth_ok {
+                    let _ = fs::write(&marker, "1");
+                }
             }
         }
 

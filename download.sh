@@ -28,7 +28,7 @@ esac
 # Prefer a native arm64 build, fall back to the x64 binary if it is missing.
 case "$ARCH" in
     arm64|aarch64)
-        if curl -fsSL -o /dev/null "$URL_BASE/${BASE}-arm64${EXT}" 2>/dev/null; then
+        if curl -fsSL -I -o /dev/null "$URL_BASE/${BASE}-arm64${EXT}" 2>/dev/null; then
             FILENAME="${BASE}-arm64${EXT}"
         else
             FILENAME="${BASE}${EXT}"

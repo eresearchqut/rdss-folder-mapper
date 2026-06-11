@@ -49,8 +49,15 @@ folder and writes a `config.json` there, resolved at runtime in this order:
    - Linux: `/etc/RDSSFolderMapper/config.json`
 2. A **developer override** dropped in the app config dir (git-ignored), e.g. on
    macOS `~/Library/Application Support/au.edu.qut.rdss-folder-mapper/config.json`.
+   This file is only honoured when it actually contains deployment keys
+   (`apiUrl`/`clientId`/`authDomain`/`callbackUrls`/`remotePath*`), so an
+   unrelated `config.json` cannot shadow the system config.
+3. **Dev builds only:** a `config.json` at the repo root (resolved via
+   `CARGO_MANIFEST_DIR`) or the current working directory. This mirrors how the
+   old Electron app read `process.cwd()/config.json` and is compiled out of
+   release builds.
 
-If neither is present the CLI runs with an empty config and emits its normal
+If none is present the CLI runs with an empty config and emits its normal
 "OAuth config is not configured" error.
 
 > **Do not commit `config.json`.** Even though the values are largely public
@@ -78,7 +85,7 @@ npm install
 npm run build --workspace=cli
 
 # 2. Run the Tauri app in dev mode (copies the sidecar, then launches)
-npm run tauri:dev --workspace=gui
+npm run dev --workspace=gui
 ```
 
 ## Packaging
@@ -86,7 +93,7 @@ npm run tauri:dev --workspace=gui
 ```bash
 # Build the CLI first, then bundle the Tauri app (.app/.dmg, .deb/.AppImage, .msi/.exe)
 npm run build --workspace=cli
-npm run tauri:build --workspace=gui
+npm run dist --workspace=gui
 ```
 
 Output is written to `gui/src-tauri/target/release/bundle/`.
@@ -102,6 +109,9 @@ is now dominated by the bundled CLI sidecar, which embeds a Node.js runtime
 - Credentials: the CLI's `refresh` flow does not prompt for SMB credentials when
   run as a subprocess, so the GUI prompts on first run (gated by a marker file) and
   persists them via the `auth` subcommand into the OS keychain / Credential Manager.
-- Structured `progress`/`event` updates were in-process callbacks under Electron;
-  over a subprocess only stdout text is available, so the log pane streams raw CLI
-  output. A machine-readable CLI output mode would restore richer progress UI.
+- Structured `progress`/`event` updates were in-process callbacks under Electron.
+  Over a subprocess they are restored via a machine-readable output mode: the CLI
+  emits sentinel-prefixed JSON lines (`@@RDSS_EVENT@@…`) when run with
+  `RDSS_JSON_EVENTS=1`, and the Tauri backend parses them and forwards them to the
+  renderer on the `progress`/`event` channels (driving the progress bar and
+  lifecycle status). Other CLI output streams to the log pane as before.
