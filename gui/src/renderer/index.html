@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'" />
   <title>RDSS Folder Mapper</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -342,7 +342,6 @@
     </div>
   </div>
 
-  <script src="tauri-shim.js"></script>
   <script>
     const modalCredentials = document.getElementById('modalCredentials');
     const credUsername     = document.getElementById('credUsername');

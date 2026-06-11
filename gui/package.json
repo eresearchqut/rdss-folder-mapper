@@ -3,14 +3,76 @@
   "version": "1.5.2",
   "private": true,
   "description": "Desktop GUI for RDSS Folder Mapper — map your research storage folders to your Desktop with a single click.",
+  "main": "dist/main.js",
   "scripts": {
-    "sidecar": "node copy-sidecar.js",
-    "tauri": "tauri",
-    "dev": "npm run sidecar && tauri dev",
-    "build": "node copy-sidecar.js",
-    "dist": "tauri build"
+    "typecheck": "tsc --noEmit",
+    "build": "node build.js",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.11.2"
+    "@types/node": "^25.9.1",
+    "electron": "42.3.0",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.0",
+    "rdss-folder-mapper": "*",
+    "typescript": "^6.0.3"
+  },
+  "build": {
+    "appId": "au.edu.qut.rdss-folder-mapper",
+    "productName": "RDSS Folder Mapper",
+    "artifactName": "rdss-folder-mapper-gui-${os}.${ext}",
+    "compression": "maximum",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/main.js",
+      "dist/preload.js",
+      "dist/worker.js",
+      "src/renderer/**/*"
+    ],
+    "publish": null,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "extendInfo": {
+        "NSDesktopFolderUsageDescription": "RDSS Folder Mapper needs access to your Desktop folder to create and manage research storage shortcuts."
+      }
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": false,
+      "perMachine": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility"
+    }
   }
 }

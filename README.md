@@ -9,13 +9,13 @@ A monorepo containing the CLI tool and desktop GUI for mapping RDSS research sto
 | Package | Description |
 |---|---|
 | [`cli/`](./cli/) | Command-line tool — map and manage research storage folders from a terminal or scheduled task |
-| [`gui/`](./gui/) | Desktop GUI — a simple one-click interface built with Tauri, designed for researchers |
+| [`gui/`](./gui/) | Desktop GUI — a simple one-click interface built with Electron, designed for researchers |
 
 ## Features
 
 - **Cross-Platform**: Works on Windows, macOS, and Linux.
 - **Standalone CLI Binaries**: Built with Node.js SEA — no runtime required on the host.
-- **Desktop GUI**: Tauri app with a clean one-click interface designed for university researchers.
+- **Desktop GUI**: Electron app with a clean one-click interface designed for university researchers.
 - **Easy Configuration**: Map multiple network drives using a simple `folders.json` file.
 
 ## Requirements
@@ -55,12 +55,9 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/eresearchqut/rdss-folde
 
 Download binaries directly:
 
-- [🪟 Windows x64 (`rdss-folder-mapper-win.exe`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe)
-- [🪟 Windows Arm64 (`rdss-folder-mapper-win-arm64.exe`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win-arm64.exe)
-- [🍎 macOS Apple Silicon (`rdss-folder-mapper-macos-arm64`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos-arm64)
-- [🍎 macOS Intel (`rdss-folder-mapper-macos`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos)
-- [🐧 Linux x64 (`rdss-folder-mapper-linux`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux)
-- [🐧 Linux Arm64 (`rdss-folder-mapper-linux-arm64`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux-arm64)
+- [🪟 Windows (`rdss-folder-mapper-win.exe`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe)
+- [🍎 macOS (`rdss-folder-mapper-macos`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos)
+- [🐧 Linux (`rdss-folder-mapper-linux`)](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux)
 
 ## Development
 

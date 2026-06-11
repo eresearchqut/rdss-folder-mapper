@@ -37,14 +37,9 @@ The CLI is suitable for advanced users and automated workflows.
 
 | Platform | Download |
 |----------|----------|
-| **macOS** (Apple Silicon) | [rdss-folder-mapper-macos-arm64](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos-arm64) |
-| **macOS** (Intel) | [rdss-folder-mapper-macos](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos) |
-| **Windows** (x64) | [rdss-folder-mapper-win.exe](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe) |
-| **Windows** (Arm64) | [rdss-folder-mapper-win-arm64.exe](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win-arm64.exe) |
-| **Linux** (x64) | [rdss-folder-mapper-linux](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux) |
-| **Linux** (Arm64) | [rdss-folder-mapper-linux-arm64](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux-arm64) |
-
-The install scripts below automatically pick the right architecture.
+| **macOS** | [rdss-folder-mapper-macos](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-macos) |
+| **Windows** | [rdss-folder-mapper-win.exe](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-win.exe) |
+| **Linux** | [rdss-folder-mapper-linux](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-linux) |
 
 ### macOS / Linux
 
