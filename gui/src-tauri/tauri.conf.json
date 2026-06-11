@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "RDSS Folder Mapper",
-  "version": "1.5.2",
+  "version": "2.0.0",
   "identifier": "au.edu.qut.rdss-folder-mapper",
   "build": {
     "frontendDist": "../src/renderer",
