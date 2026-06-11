@@ -10,22 +10,26 @@
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder"
   },
-  "dependencies": {
-    "rdss-folder-mapper": "*"
-  },
   "devDependencies": {
     "@types/node": "^25.9.1",
     "electron": "42.3.0",
     "electron-builder": "^26.8.1",
     "esbuild": "^0.28.0",
+    "rdss-folder-mapper": "*",
     "typescript": "^6.0.3"
   },
   "build": {
     "appId": "au.edu.qut.rdss-folder-mapper",
     "productName": "RDSS Folder Mapper",
     "artifactName": "rdss-folder-mapper-gui-${os}.${ext}",
+    "compression": "maximum",
+    "directories": {
+      "output": "release"
+    },
     "files": [
-      "dist/**/*",
+      "dist/main.js",
+      "dist/preload.js",
+      "dist/worker.js",
       "src/renderer/**/*"
     ],
     "publish": null,

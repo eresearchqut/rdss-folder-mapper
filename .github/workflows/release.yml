@@ -36,13 +36,13 @@ jobs:
         include:
           - os: macos-latest
             name: macos
-            artifact: "gui/dist/*.dmg"
+            artifact: "gui/release/*.dmg"
           - os: windows-latest
             name: windows
-            artifact: "gui/dist/*.exe"
+            artifact: "gui/release/*.exe"
           - os: ubuntu-latest
             name: linux
-            artifact: "gui/dist/*.AppImage"
+            artifact: "gui/release/*.AppImage"
 
     runs-on: ${{ matrix.os }}
 

@@ -16,6 +16,7 @@ cli/tmp
 cli/sea-config.json
 cli/tsconfig.tsbuildinfo
 gui/dist
+gui/release
 # docs generated artifacts
 docs/.vitepress/dist
 docs/.vitepress/cache
