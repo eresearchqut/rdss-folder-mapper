@@ -10,7 +10,7 @@
     "dist": "npm run build && npm run dist --workspace=gui",
     "test": "npm run test --workspace=cli",
     "lint": "npm run lint --workspace=cli",
-    "start:gui": "npm run build:ts --workspace=cli && npm run start --workspace=gui",
+    "start:gui": "npm run build --workspace=cli && npm run dev --workspace=gui",
     "docs:dev": "vitepress dev docs",
     "docs:build": "node docs/screenshots/capture.mjs && vitepress build docs",
     "docs:screenshots": "node docs/screenshots/capture.mjs",

@@ -1,0 +1,40 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "RDSS Folder Mapper",
+  "version": "1.5.2",
+  "identifier": "au.edu.qut.rdss-folder-mapper",
+  "build": {
+    "frontendDist": "../src/renderer",
+    "beforeBuildCommand": "npm run sidecar"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "RDSS Folder Mapper",
+        "width": 520,
+        "height": 560,
+        "resizable": false,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/rdss-folder-mapper"],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}

@@ -11,8 +11,11 @@ const TMP_DIR = path.join(__dirname, 'tmp');
 
 const TARGETS = [
   { os: 'linux', arch: 'x64', ext: '', name: 'linux' },
+  { os: 'linux', arch: 'arm64', ext: '', name: 'linux-arm64' },
   { os: 'darwin', arch: 'x64', ext: '', name: 'macos' },
+  { os: 'darwin', arch: 'arm64', ext: '', name: 'macos-arm64' },
   { os: 'win32', arch: 'x64', ext: '.exe', name: 'win' },
+  { os: 'win32', arch: 'arm64', ext: '.exe', name: 'win-arm64' },
 ];
 
 async function downloadFile(url, dest) {
@@ -84,7 +87,7 @@ async function build() {
   execSync('node --experimental-sea-config sea-config.json', { stdio: 'inherit' });
 
   for (const target of TARGETS) {
-    console.log(`\n--- Building for ${target.os} ---`);
+    console.log(`\n--- Building for ${target.os} (${target.arch}) ---`);
     const nodeBinaryPath = await extractNode(target);
 
     const execName = `rdss-folder-mapper-${target.name}${target.ext}`;
