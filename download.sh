@@ -4,16 +4,20 @@ set -e
 REPO="eresearchqut/rdss-folder-mapper"
 URL_BASE="https://github.com/$REPO/releases/latest/download"
 OS=$(uname -s)
+ARCH=$(uname -m)
 
 case "$OS" in
     Linux*)
-        FILENAME="rdss-folder-mapper-linux"
+        BASE="rdss-folder-mapper-linux"
+        EXT=""
         ;;
     Darwin*)
-        FILENAME="rdss-folder-mapper-macos"
+        BASE="rdss-folder-mapper-macos"
+        EXT=""
         ;;
     CYGWIN*|MINGW*|MSYS*)
-        FILENAME="rdss-folder-mapper-win.exe"
+        BASE="rdss-folder-mapper-win"
+        EXT=".exe"
         ;;
     *)
         echo "Unsupported OS: $OS"
@@ -21,7 +25,21 @@ case "$OS" in
         ;;
 esac
 
-echo "Downloading latest rdss-folder-mapper for $OS..."
+# Prefer a native arm64 build, fall back to the x64 binary if it is missing.
+case "$ARCH" in
+    arm64|aarch64)
+        if curl -fsSL -o /dev/null "$URL_BASE/${BASE}-arm64${EXT}" 2>/dev/null; then
+            FILENAME="${BASE}-arm64${EXT}"
+        else
+            FILENAME="${BASE}${EXT}"
+        fi
+        ;;
+    *)
+        FILENAME="${BASE}${EXT}"
+        ;;
+esac
+
+echo "Downloading latest rdss-folder-mapper ($FILENAME) for $OS/$ARCH..."
 curl -fsSL "$URL_BASE/$FILENAME" -o rdss-folder-mapper
 chmod +x rdss-folder-mapper
 
