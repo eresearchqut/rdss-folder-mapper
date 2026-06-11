@@ -1,11 +1,6 @@
 # RDSS Folder Mapper — Desktop GUI
 
-A desktop application for university researchers to map RDSS research storage folders to their Desktop with a single click.
-
-This branch (`tauri-gui`) is an experiment that builds the GUI with
-[Tauri v2](https://v2.tauri.app/) instead of Electron. The original Electron
-implementation (`src/main.ts`, `src/preload.ts`, `src/worker.ts`, `build.js`) is
-kept in place for reference and comparison.
+A desktop application for university researchers to map RDSS research storage folders to their Desktop with a single click. The GUI is built with [Tauri v2](https://v2.tauri.app/).
 
 ## What it does
 

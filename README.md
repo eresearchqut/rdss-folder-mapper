@@ -9,13 +9,13 @@ A monorepo containing the CLI tool and desktop GUI for mapping RDSS research sto
 | Package | Description |
 |---|---|
 | [`cli/`](./cli/) | Command-line tool — map and manage research storage folders from a terminal or scheduled task |
-| [`gui/`](./gui/) | Desktop GUI — a simple one-click interface built with Electron, designed for researchers |
+| [`gui/`](./gui/) | Desktop GUI — a simple one-click interface built with Tauri, designed for researchers |
 
 ## Features
 
 - **Cross-Platform**: Works on Windows, macOS, and Linux.
 - **Standalone CLI Binaries**: Built with Node.js SEA — no runtime required on the host.
-- **Desktop GUI**: Electron app with a clean one-click interface designed for university researchers.
+- **Desktop GUI**: Tauri app with a clean one-click interface designed for university researchers.
 - **Easy Configuration**: Map multiple network drives using a simple `folders.json` file.
 
 ## Requirements
