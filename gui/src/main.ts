@@ -242,11 +242,11 @@ ipcMain.handle('open-base-dir', async () => {
 });
 
 ipcMain.handle('open-help', () => {
-  shell.openExternal('https://eresearchqut.github.io/rdss-folder-mapper');
+  return shell.openExternal('https://eresearchqut.github.io/rdss-folder-mapper');
 });
 
 ipcMain.handle('open-rdss-help', () => {
-  shell.openExternal('https://docs.eres.qut.edu.au/rdss-faqs#organising-your-data');
+  return shell.openExternal('https://docs.eres.qut.edu.au/rdss-faqs#organising-your-data');
 });
 
 /**
