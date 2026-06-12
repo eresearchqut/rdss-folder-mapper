@@ -280,6 +280,7 @@
     <div class="bottom-bar">
       <span class="version-tag" id="versionTag"></span>
       <button class="btn-activity-log" id="btnHelp" style="margin-left:10px;">Guide ↗</button>
+      <button class="btn-activity-log" id="btnRdssHelp" style="margin-left:10px;">Set up RDSS ↗</button>
       <div style="flex:1"></div>
       <button class="btn-activity-log" id="btnActivityLog">Activity log ↗</button>
     </div>
@@ -407,6 +408,7 @@
     const versionTag    = document.getElementById('versionTag');
     const btnActivityLog = document.getElementById('btnActivityLog');
     const btnHelp        = document.getElementById('btnHelp');
+    const btnRdssHelp    = document.getElementById('btnRdssHelp');
 
     const progressSection = document.getElementById('progressSection');
     const progressLabel   = document.getElementById('progressLabel');
@@ -439,6 +441,7 @@
 
     btnActivityLog.addEventListener('click', () => window.api.openLogFile());
     btnHelp.addEventListener('click', () => window.api.openHelp());
+    btnRdssHelp.addEventListener('click', () => window.api.openRdssHelp());
     statusLogLink.addEventListener('click', () => window.api.openLogFile());
 
     // Progress events

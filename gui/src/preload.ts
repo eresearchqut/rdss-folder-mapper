@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('api', {
   openBaseDir: (): Promise<void> => ipcRenderer.invoke('open-base-dir'),
   openHelp: (): Promise<void> => ipcRenderer.invoke('open-help'),
 
+  openRdssHelp: (): Promise<void> => ipcRenderer.invoke('open-rdss-help'),
+
   cancelOperation: (): Promise<void> => ipcRenderer.invoke('cancel-operation'),
 
   mapFolders: (): Promise<{ success: boolean; cancelled: boolean }> => ipcRenderer.invoke('map-folders'),

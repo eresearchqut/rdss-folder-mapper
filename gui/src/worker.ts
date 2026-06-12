@@ -24,6 +24,7 @@ process.stderr.write = capture(origErr) as typeof process.stderr.write;
 interface WorkerConfig {
   debug: boolean;
   baseDir: string;
+  foldersFile?: string;
   remotePath?: string;
   apiUrl?: string;
   clientId?: string;
@@ -53,6 +54,7 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
       await refresh({
         debug: config.debug,
         baseDir: config.baseDir,
+        foldersFile: config.foldersFile,
         remotePath: config.remotePath,
         apiUrl: config.apiUrl,
         clientId: config.clientId,

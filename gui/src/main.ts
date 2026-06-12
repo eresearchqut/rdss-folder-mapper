@@ -155,6 +155,7 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
       debug: config.debug,
       baseDir: config.baseDir,
       remotePath: deployRemotePath,
+      foldersFile: path.join(app.getPath('userData'), 'folders.json'),
     };
 
     const worker = new Worker(path.join(__dirname, 'worker.js'));
@@ -242,6 +243,10 @@ ipcMain.handle('open-base-dir', async () => {
 
 ipcMain.handle('open-help', () => {
   shell.openExternal('https://eresearchqut.github.io/rdss-folder-mapper');
+});
+
+ipcMain.handle('open-rdss-help', () => {
+  shell.openExternal('https://docs.eres.qut.edu.au/rdss-faqs#organising-your-data');
 });
 
 /**
