@@ -88,9 +88,19 @@ jobs:
         with:
           files: release-files/**
 
+      # action-gh-release won't move an existing tag, so the rolling "latest"
+      # tag/release would otherwise stay pinned to the commit it was first
+      # created at. Delete it (and its tag) so the next step recreates it at
+      # the current commit with fresh metadata.
+      - name: Remove previous 'latest' release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+
       - name: Update Latest Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
+          target_commitish: ${{ github.sha }}
           make_latest: true
           files: release-files/**
