@@ -146,6 +146,25 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
 
+    /* ── Help card (shown when no research folders are available) ── */
+    .help-card {
+      background: var(--qut-pale);
+      border: 1px solid var(--qut-light-blue); border-radius: 8px;
+      padding: 14px 16px; margin-bottom: 14px;
+    }
+    .help-card.hidden { display: none; }
+    .help-card-title { font-size: 13px; font-weight: 700; color: var(--qut-navy); margin-bottom: 6px; }
+    .help-card-body { font-size: 12px; color: var(--qut-text); line-height: 1.5; }
+    .help-card-steps {
+      margin: 8px 0 8px 18px; padding: 0;
+      font-size: 12px; color: var(--qut-text); line-height: 1.6;
+    }
+    .help-card-link {
+      margin-top: 10px; background: none; border: none; cursor: pointer; padding: 0;
+      font-size: 12px; font-weight: 600; color: var(--qut-blue); transition: color 0.15s;
+    }
+    .help-card-link:hover { color: var(--qut-navy); text-decoration: underline; }
+
     .btn {
       width: 100%; padding: 10px 12px; border: none; border-radius: 6px;
       font-size: 14px; font-weight: 600; cursor: pointer;
@@ -273,14 +292,28 @@
       <span class="location-chip-path" id="locationPath"></span>
     </div>
 
+    <div class="help-card hidden" id="helpCard">
+      <div class="help-card-title">Nothing to connect yet</div>
+      <div class="help-card-body">
+        We couldn't find any RDSS data storage linked to your account. To get started, use the Data Management Planner:
+      </div>
+      <ol class="help-card-steps">
+        <li>Create a Data Management Plan</li>
+        <li>Request Data Storage for that plan</li>
+      </ol>
+      <div class="help-card-body">
+        Storage can take a few minutes to be created. Once it's ready, click <strong>Connect Research Folders</strong> again.
+      </div>
+      <button class="help-card-link" id="helpFaqLink">See the RDSS FAQs ↗</button>
+    </div>
+
     <button class="btn btn-primary" id="btnMap">Connect Research Folders</button>
     <button class="btn btn-secondary" id="btnRemove">Remove Shortcuts</button>
     <button class="btn btn-cancel hidden" id="btnCancelOp">Cancel</button>
 
     <div class="bottom-bar">
       <span class="version-tag" id="versionTag"></span>
-      <button class="btn-activity-log" id="btnHelp" style="margin-left:10px;">Guide ↗</button>
-      <button class="btn-activity-log" id="btnRdssHelp" style="margin-left:10px;">Set up RDSS ↗</button>
+      <button class="btn-activity-log" id="btnRdssHelp" style="margin-left:10px;">RDSS FAQs ↗</button>
       <div style="flex:1"></div>
       <button class="btn-activity-log" id="btnActivityLog">Activity log ↗</button>
     </div>
@@ -407,8 +440,9 @@
     const btnSignOut    = document.getElementById('btnSignOut');
     const versionTag    = document.getElementById('versionTag');
     const btnActivityLog = document.getElementById('btnActivityLog');
-    const btnHelp        = document.getElementById('btnHelp');
     const btnRdssHelp    = document.getElementById('btnRdssHelp');
+    const helpCard       = document.getElementById('helpCard');
+    const helpFaqLink    = document.getElementById('helpFaqLink');
 
     const progressSection = document.getElementById('progressSection');
     const progressLabel   = document.getElementById('progressLabel');
@@ -417,6 +451,8 @@
     const progressFolder  = document.getElementById('progressFolder');
 
     let currentConfig = null;
+    // Number of folders mapped from the retrieved folders.json (from the latest 'plans:fetched' event).
+    let mappedFolderCount = null;
 
     const refreshRemoveButton = () =>
       window.api.hasShortcuts().then(has => { btnRemove.classList.toggle('hidden', !has); });
@@ -440,8 +476,8 @@
     });
 
     btnActivityLog.addEventListener('click', () => window.api.openLogFile());
-    btnHelp.addEventListener('click', () => window.api.openHelp());
     btnRdssHelp.addEventListener('click', () => window.api.openRdssHelp());
+    helpFaqLink.addEventListener('click', () => window.api.openRdssHelp());
     statusLogLink.addEventListener('click', () => window.api.openLogFile());
 
     // Progress events
@@ -468,6 +504,8 @@
         progressFolder.textContent = '';
       } else if (event.type === 'plans:fetching') {
         progressLabel.textContent = 'Fetching folder list…';
+      } else if (event.type === 'plans:fetched') {
+        mappedFolderCount = event.count ?? 0;
       } else if (event.type === 'mount:start') {
         progressLabel.textContent = 'Connecting folders…';
       }
@@ -561,6 +599,8 @@
 
     btnMap.addEventListener('click', async () => {
       resetProgress();
+      helpCard.classList.add('hidden');
+      mappedFolderCount = null;
       setBusy(true);
       setStatus('Connecting folders…', '#f57c00');
 
@@ -569,6 +609,10 @@
       if (result.cancelled) {
         setStatus('Cancelled', '#888');
         resetProgress();
+      } else if (result.success && mappedFolderCount === 0) {
+        setStatus('No research folders found', '#f57c00');
+        resetProgress();
+        helpCard.classList.remove('hidden');
       } else if (result.success) {
         setStatus('All done! Folders are ready to open', '#2e7d32');
         progressFill.style.width = '100%';

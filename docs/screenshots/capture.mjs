@@ -37,7 +37,6 @@ const mockScript = `
     clearAuth:            ()    => Promise.resolve(),
     openLogFile:          ()    => Promise.resolve(),
     openBaseDir:          ()    => Promise.resolve(),
-    openHelp:             ()    => Promise.resolve(),
     hasShortcuts:         ()    => Promise.resolve(false),
     onLog:                (cb)  => {},
     onProgress:           (cb)  => { window._progressCb = cb; },
