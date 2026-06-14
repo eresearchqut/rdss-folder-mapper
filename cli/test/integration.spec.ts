@@ -33,6 +33,13 @@ describe('Mount Integration Test', () => {
     await container.exec(['sh', '-c', 'echo "bob_data" > /home/bob/bob_test.txt']);
     await container.exec(['chown', '-R', 'alice:smb', '/home/alice']);
     await container.exec(['chown', '-R', 'bob:smb', '/home/bob']);
+
+    // A user whose password contains special characters (including '!', '@', '#',
+    // '$', '^', '&', '*', '(', ')', '-') to exercise authentication with the kinds
+    // of passwords reported as failing in the field.
+    await container.exec(['mkdir', '-p', '/home/paola']);
+    await container.exec(['sh', '-c', 'echo "paola_data" > /home/paola/paola_test.txt']);
+    await container.exec(['chown', '-R', 'paola:smb', '/home/paola']);
   }, 120000);
 
   afterAll(async () => {
@@ -413,6 +420,35 @@ exit 0
         'ls',
       ]);
       expect(aliceDenyExec.exitCode).not.toBe(0);
+    });
+
+    test('should authenticate a user whose password contains special characters', async () => {
+      const specialPassword = 'P@ss!w0rd#$^&*()-';
+
+      // Authenticate against Samba using the special-character password. The args
+      // are passed as an array (no shell), so the only parsing is smbclient's own
+      // 'user%password' split — the password deliberately contains no '%'.
+      const paolaExec = await container.exec([
+        'smbclient',
+        '//127.0.0.1/paola',
+        '-U',
+        `paola%${specialPassword}`,
+        '-c',
+        'get paola_test.txt -',
+      ]);
+      expect(paolaExec.exitCode).toBe(0);
+      expect(paolaExec.output).toContain('paola_data');
+
+      // The wrong password must be rejected.
+      const paolaDenyExec = await container.exec([
+        'smbclient',
+        '//127.0.0.1/paola',
+        '-U',
+        'paola%wrongpassword',
+        '-c',
+        'ls',
+      ]);
+      expect(paolaDenyExec.exitCode).not.toBe(0);
     });
   });
 });

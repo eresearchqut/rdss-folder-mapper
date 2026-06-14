@@ -241,6 +241,110 @@ describe('mount.ts unit tests', () => {
     });
   });
 
+  describe('mountMac – special characters in password', () => {
+    // Extracts the [domain;]user:password segment from the smb:// URL that
+    // mountMac passes to mount_smbfs. user and password are percent-encoded,
+    // so they contain no raw ';', ':' or '@' to confuse this parser.
+    const parseSmbUrl = (url: string) => {
+      const match = url.match(/^smb:\/\/(?:([^;]*);)?([^:]*):([^@]*)@(.*)$/);
+      if (!match) throw new Error(`Unexpected smb URL: ${url}`);
+      return { domain: match[1], user: match[2], password: match[3], hostAndShare: match[4] };
+    };
+
+    const callMountMac = (password: string, username = 'testuser', adDomain?: string) => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+
+      mountMac({
+        remotePath: 'smb://storage.example.com/projects',
+        localPath: '/home/user/Desktop/RDSS Folders/My Project [abc]',
+        mountPath: '/home/user/Desktop/RDSS Folders/.mounts/abc',
+        baseDir: '/home/user/Desktop/RDSS Folders',
+        os: 'darwin' as any,
+        debug: false,
+        credentials: { username, password, adDomain },
+      });
+
+      const args = vi.mocked(child_process.execFileSync).mock.calls[0][1] as string[];
+      return parseSmbUrl(args[0]);
+    };
+
+    // Characters that would corrupt the smb:// authority if left unencoded.
+    // '%' is excluded because it is the percent-encoding escape character and is
+    // expected to appear in the encoded output; its round-trip is covered above.
+    const urlBreaking = ['@', ':', '/', '?', '#', '&', ';', ' '];
+
+    test.each([
+      ['shell/url metacharacters', '!@#$%^&*()-'],
+      ['symbols and quotes', `=+[]{}|\\:";'<>,.?/`],
+      ['contains an @ like an email', 'p@ssw0rd@QUT'],
+      ['contains a colon and slash', 'a:b/c:d'],
+      ['contains an ampersand and hash', 'foo&bar#baz'],
+      ['contains a percent sign', '50%off%20'],
+      ['contains spaces', 'correct horse battery staple'],
+      ['contains a semicolon', 'pa;ss;word'],
+      ['is only exclamation marks', '!!!!!'],
+      ['mixes exclamation marks with other characters', 'p@ss!w0rd!#$'],
+    ])('round-trips a password that %s', (_label, password) => {
+      const { password: encoded } = callMountMac(password);
+      // The decoded password placed in the URL must equal the original, or SMB
+      // authentication will be attempted with the wrong secret.
+      expect(decodeURIComponent(encoded)).toBe(password);
+    });
+
+    it('leaves exclamation marks literal but still round-trips them', () => {
+      // encodeURIComponent does not escape '!', which is a valid sub-delimiter in
+      // a URL userinfo component, so it is passed through verbatim to mount_smbfs.
+      const password = 'Tr0ub4dor!&3';
+      const { password: encoded } = callMountMac(password);
+      expect(encoded).toContain('!');
+      expect(decodeURIComponent(encoded)).toBe(password);
+    });
+
+    it('percent-encodes URL-breaking characters in the password', () => {
+      const password = urlBreaking.join('');
+      const { password: encoded } = callMountMac(password);
+      for (const ch of urlBreaking) {
+        expect(encoded).not.toContain(ch);
+      }
+      expect(decodeURIComponent(encoded)).toBe(password);
+    });
+
+    it('round-trips username, password and domain together (mirrors a UPN login)', () => {
+      const { domain, user, password } = callMountMac('S3cr3t!@#$', 'totagian@qut.edu.au', 'qutad');
+      expect(decodeURIComponent(user)).toBe('totagian@qut.edu.au');
+      expect(decodeURIComponent(password)).toBe('S3cr3t!@#$');
+      expect(decodeURIComponent(domain)).toBe('qutad');
+      // The '@' in the username must be encoded so it is not mistaken for the
+      // userinfo/host separator.
+      expect(user).not.toContain('@');
+    });
+
+    it('does not leak the password in the debug log', () => {
+      const debugSpy = vi.spyOn(signale, 'debug').mockImplementation(() => {});
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+
+      const password = 'My!Secret@123';
+      mountMac({
+        remotePath: 'smb://storage.example.com/projects',
+        localPath: '/base/My Project [abc]',
+        mountPath: '/base/.mounts/abc',
+        baseDir: '/base',
+        os: 'darwin' as any,
+        debug: true,
+        credentials: { username: 'testuser', password },
+      });
+
+      const logged = debugSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(logged).not.toContain(password);
+      expect(logged).not.toContain(encodeURIComponent(password));
+      expect(logged).toContain('***');
+    });
+  });
+
   describe('mountLinux – C2 shell injection regression', () => {
     it('calls execFileSync with an argument array (no shell) for sudo mount', () => {
       vi.mocked(os.platform).mockReturnValue('linux');
