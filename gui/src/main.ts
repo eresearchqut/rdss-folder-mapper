@@ -174,7 +174,10 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
       } else if (msg.type === 'event') {
         mainWindow?.webContents.send('event', msg.event);
       } else if (msg.type === 'credentials-required') {
-        mainWindow?.webContents.send('credentials-required', { defaultUsername: os.userInfo().username });
+        mainWindow?.webContents.send('credentials-required', {
+          defaultUsername: os.userInfo().username,
+          adDomainConfigured: Boolean(deployConfig.adDomain),
+        });
       } else if (msg.type === 'done') {
         activeWorker = null;
         resolve({ success: msg.success ?? false, cancelled: false });

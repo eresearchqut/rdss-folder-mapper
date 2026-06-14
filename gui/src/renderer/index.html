@@ -223,6 +223,7 @@
     .settings-title { font-size: 15px; font-weight: 700; color: var(--qut-navy); margin-bottom: 12px; }
 
     .field { margin-bottom: 10px; }
+    .field.hidden { display: none; }
     .field > label:not(.checkbox-row) { display: block; font-size: 12px; font-weight: 600; color: var(--qut-subtle); margin-bottom: 5px; }
     .field .hint { font-size: 11px; color: #9aa5b2; margin-top: 4px; }
 
@@ -364,7 +365,7 @@
         <label for="credPassword">Password</label>
         <input type="password" id="credPassword" autocomplete="current-password" />
       </div>
-      <div class="field">
+      <div class="field" id="credDomainField">
         <label for="credDomain">AD Domain <span style="font-weight:400;color:#9aa5b2">(optional)</span></label>
         <input type="text" id="credDomain" placeholder="e.g. QUT" autocomplete="off" />
       </div>
@@ -381,13 +382,17 @@
     const credUsername     = document.getElementById('credUsername');
     const credPassword     = document.getElementById('credPassword');
     const credDomain       = document.getElementById('credDomain');
+    const credDomainField  = document.getElementById('credDomainField');
     const btnCredCancel    = document.getElementById('btnCredCancel');
     const btnCredSubmit    = document.getElementById('btnCredSubmit');
 
-    const showCredentialsModal = (defaultUsername = '') => {
+    const showCredentialsModal = (defaultUsername = '', adDomainConfigured = false) => {
       credUsername.value = defaultUsername;
       credPassword.value = '';
       credDomain.value   = '';
+      // When the deployment config.json already specifies an AD domain, don't
+      // offer an input to change it.
+      credDomainField.classList.toggle('hidden', adDomainConfigured);
       modalCredentials.classList.remove('hidden');
       (defaultUsername ? credPassword : credUsername).focus();
     };
@@ -419,7 +424,8 @@
 
     credPassword.addEventListener('keydown', e => { if (e.key === 'Enter') btnCredSubmit.click(); });
 
-    window.api.onCredentialsRequired(({ defaultUsername }) => showCredentialsModal(defaultUsername));
+    window.api.onCredentialsRequired(({ defaultUsername, adDomainConfigured }) =>
+      showCredentialsModal(defaultUsername, adDomainConfigured));
 
     const panelMain     = document.getElementById('panelMain');
     const panelSettings = document.getElementById('panelSettings');

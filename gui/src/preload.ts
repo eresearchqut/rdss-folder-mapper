@@ -32,7 +32,7 @@ contextBridge.exposeInMainWorld('api', {
   submitCredentials: (credentials: { username: string; password: string; adDomain?: string }): Promise<void> =>
     ipcRenderer.invoke('submit-credentials', credentials),
 
-  onCredentialsRequired: (callback: (data: { defaultUsername: string }) => void) => {
+  onCredentialsRequired: (callback: (data: { defaultUsername: string; adDomainConfigured?: boolean }) => void) => {
     ipcRenderer.on('credentials-required', (_event, data) => callback(data));
   },
 
