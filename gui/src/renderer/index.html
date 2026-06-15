@@ -265,6 +265,22 @@
 
     .settings-actions { display: flex; gap: 10px; margin-top: auto; padding-top: 8px; }
     .settings-actions .btn { margin-bottom: 0; }
+
+    .config-sources {
+      background: var(--qut-white); border: 1px solid var(--qut-border); border-radius: 8px;
+      padding: 8px 10px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .config-source { display: flex; align-items: baseline; gap: 8px; }
+    .config-source .cs-status { flex-shrink: 0; font-size: 12px; line-height: 1.3; }
+    .config-source .cs-status.loaded { color: #2e7d32; }
+    .config-source .cs-status.missing { color: #9aa5b2; }
+    .config-source .cs-body { min-width: 0; }
+    .config-source .cs-label { font-size: 11px; font-weight: 600; color: var(--qut-subtle); }
+    .config-source .cs-path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px; color: var(--qut-text); word-break: break-all;
+    }
+    .config-source.missing .cs-path { color: #9aa5b2; }
   </style>
 </head>
 <body>
@@ -347,6 +363,12 @@
         <input type="checkbox" id="chkDebug" />
         <span>Enable verbose debug output in the activity log</span>
       </label>
+    </div>
+
+    <div class="field hidden" id="configSourcesRow">
+      <label>Configuration sources</label>
+      <div class="config-sources" id="configSources"></div>
+      <div class="hint">Config files the app reads, in priority order (later overrides earlier).</div>
     </div>
 
     <div class="settings-actions">
@@ -448,6 +470,8 @@
     const locationPath  = document.getElementById('locationPath');
     const inputBaseDir   = document.getElementById('inputBaseDir');
     const chkDebug      = document.getElementById('chkDebug');
+    const configSourcesRow = document.getElementById('configSourcesRow');
+    const configSources    = document.getElementById('configSources');
     const btnBrowse     = document.getElementById('btnBrowse');
     const btnSave       = document.getElementById('btnSave');
     const btnCancel     = document.getElementById('btnCancel');
@@ -570,11 +594,52 @@
         clearKeychainRow.classList.toggle('hidden', !has);
       });
 
+    const renderConfigSources = async () => {
+      try {
+        const sources = await window.api.getConfigSources();
+        configSources.innerHTML = '';
+        sources.forEach(src => {
+          const row = document.createElement('div');
+          row.className = 'config-source' + (src.loaded ? '' : ' missing');
+          const status = document.createElement('span');
+          status.className = 'cs-status ' + (src.loaded ? 'loaded' : 'missing');
+          status.textContent = src.loaded ? '●' : '○';
+          status.title = src.loaded ? 'Loaded' : 'Not found';
+          const body = document.createElement('div');
+          body.className = 'cs-body';
+          const label = document.createElement('div');
+          label.className = 'cs-label';
+          label.textContent = src.label + (src.loaded ? '' : ' (not found)');
+          const pathEl = document.createElement('div');
+          pathEl.className = 'cs-path';
+          pathEl.textContent = src.path;
+          body.appendChild(label);
+          body.appendChild(pathEl);
+          row.appendChild(status);
+          row.appendChild(body);
+          configSources.appendChild(row);
+        });
+      } catch {
+        configSources.textContent = 'Unable to determine config sources.';
+      }
+    };
+
+    // The config-sources row is a debug-only diagnostic; show it whenever debug
+    // logging is enabled and refresh its contents when revealed.
+    const updateConfigSourcesVisibility = () => {
+      const show = chkDebug.checked;
+      configSourcesRow.classList.toggle('hidden', !show);
+      if (show) renderConfigSources();
+    };
+
+    chkDebug.addEventListener('change', updateConfigSourcesVisibility);
+
     const showSettings = () => {
       window.api.getConfig().then(cfg => {
         currentConfig = cfg;
         inputBaseDir.value   = cfg.baseDir;
         chkDebug.checked   = cfg.debug;
+        updateConfigSourcesVisibility();
         panelMain.classList.add('hidden');
         panelSettings.classList.remove('hidden');
         btnSettings.classList.add('active');
