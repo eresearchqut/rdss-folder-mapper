@@ -153,7 +153,7 @@ const saveConfig = (config: Config): void => {
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 520,
-    height: 620,
+    height: 680,
     resizable: false,
     title: 'RDSS Folder Mapper',
     webPreferences: {
@@ -310,6 +310,8 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
 ipcMain.handle('get-config', () => loadConfig());
 
 ipcMain.handle('get-config-sources', () => getConfigSources());
+
+ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
 
 ipcMain.handle('open-config-file', async (_event, filePath: string) => {
   // Only allow opening a path that is a known, currently-loaded config source,

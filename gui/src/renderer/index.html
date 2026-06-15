@@ -77,6 +77,7 @@
 
     /* ── Panels ── */
     .panel { display: flex; flex-direction: column; flex: 1; padding: 14px 20px 12px; overflow: hidden; }
+    #panelSettings { overflow-y: auto; }
     .panel.hidden { display: none; }
 
     /* ── Main panel ── */
@@ -283,6 +284,13 @@
     .config-source.missing .cs-path { color: #9aa5b2; }
     a.cs-path { cursor: pointer; color: var(--qut-blue); text-decoration: none; }
     a.cs-path:hover { text-decoration: underline; }
+
+    .resolved-config {
+      background: var(--qut-white); border: 1px solid var(--qut-border); border-radius: 8px;
+      padding: 8px 10px; margin: 0; max-height: 150px; overflow: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px; color: var(--qut-text); white-space: pre; line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -371,6 +379,12 @@
       <label>Configuration sources</label>
       <div class="config-sources" id="configSources"></div>
       <div class="hint">Config files the app reads, in priority order (later overrides earlier). Click a loaded path to open it.</div>
+    </div>
+
+    <div class="field hidden" id="resolvedConfigRow">
+      <label>Resolved configuration</label>
+      <pre class="resolved-config" id="resolvedConfig"></pre>
+      <div class="hint">The effective config the app runs with after merging all sources.</div>
     </div>
 
     <div class="settings-actions">
@@ -474,6 +488,8 @@
     const chkDebug      = document.getElementById('chkDebug');
     const configSourcesRow = document.getElementById('configSourcesRow');
     const configSources    = document.getElementById('configSources');
+    const resolvedConfigRow = document.getElementById('resolvedConfigRow');
+    const resolvedConfig    = document.getElementById('resolvedConfig');
     const btnBrowse     = document.getElementById('btnBrowse');
     const btnSave       = document.getElementById('btnSave');
     const btnCancel     = document.getElementById('btnCancel');
@@ -630,12 +646,25 @@
       }
     };
 
+    const renderResolvedConfig = async () => {
+      try {
+        const resolved = await window.api.getResolvedConfig();
+        resolvedConfig.textContent = JSON.stringify(resolved ?? {}, null, 2);
+      } catch {
+        resolvedConfig.textContent = 'Unable to determine resolved config.';
+      }
+    };
+
     // The config-sources row is a debug-only diagnostic; show it whenever debug
     // logging is enabled and refresh its contents when revealed.
     const updateConfigSourcesVisibility = () => {
       const show = chkDebug.checked;
       configSourcesRow.classList.toggle('hidden', !show);
-      if (show) renderConfigSources();
+      resolvedConfigRow.classList.toggle('hidden', !show);
+      if (show) {
+        renderConfigSources();
+        renderResolvedConfig();
+      }
     };
 
     chkDebug.addEventListener('change', updateConfigSourcesVisibility);
