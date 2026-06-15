@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import os from 'os';
 import path from 'path';
-import { BASE_DIR, formatRemoteBase } from './index';
+import { BASE_DIR, formatRemoteBase, trimSlashes } from './index';
 import { getOs } from './os';
 
 const macOs = () => ({ ...getOs(), isMac: true, isWindows: false, isLinux: false });
@@ -47,5 +47,22 @@ describe('formatRemoteBase', () => {
 
   it('converts a UNC path to an smb:// URL on nix', () => {
     expect(formatRemoteBase('\\\\host\\sub', macOs())).toBe('smb://host/sub');
+  });
+});
+
+describe('trimSlashes', () => {
+  it('trims leading and trailing slashes and backslashes', () => {
+    expect(trimSlashes('/Projects/')).toBe('Projects');
+    expect(trimSlashes('\\\\share\\\\')).toBe('share');
+  });
+
+  it('preserves internal separators and unaffected strings', () => {
+    expect(trimSlashes('Projects')).toBe('Projects');
+    expect(trimSlashes('a/b')).toBe('a/b');
+  });
+
+  it('returns an empty string when the input is only separators', () => {
+    expect(trimSlashes('///')).toBe('');
+    expect(trimSlashes('')).toBe('');
   });
 });

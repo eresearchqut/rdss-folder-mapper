@@ -159,7 +159,7 @@ const deploymentServer = (): string | undefined => {
   if (!host) return undefined;
   return formatRemoteBase(host, getOs())
     .replace(/^smb:\/\//, '')
-    .replace(/\/.*$/, '');
+    .split('/')[0];
 };
 
 /**
@@ -211,7 +211,7 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
           try {
             const server = formatRemoteBase(deployRemotePath, getOs())
               .replace(/^smb:\/\//, '')
-              .replace(/\/.*$/, '');
+              .split('/')[0];
             defaultUsername = getMacInternetPasswordAccount(server, config.debug ?? false) ?? defaultUsername;
           } catch { /* fall back to the OS login name */ }
         }

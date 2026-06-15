@@ -142,6 +142,18 @@ export const formatRemoteBase = (value: string, osInfo: OsInfo): string => {
 };
 
 /**
+ * Trim leading and trailing slashes/backslashes from a string. Uses index walks
+ * rather than a regex to avoid polynomial backtracking on adversarial input.
+ */
+export const trimSlashes = (value: string): string => {
+  let start = 0;
+  let end = value.length;
+  while (start < end && (value[start] === '/' || value[start] === '\\')) start++;
+  while (end > start && (value[end - 1] === '/' || value[end - 1] === '\\')) end--;
+  return value.slice(start, end);
+};
+
+/**
  * Read config.json and derive the bare SMB server host (e.g. "rstore.qut.edu.au")
  * from the configured remote path for the current platform. Returns undefined
  * when config.json is missing/unparseable or no remote path is configured.
@@ -155,7 +167,7 @@ const readRemoteServer = (osInfo: OsInfo): string | undefined => {
     if (!raw) return undefined;
     return formatRemoteBase(raw, osInfo)
       .replace(/^smb:\/\//, '')
-      .replace(/\/.*$/, '');
+      .split('/')[0];
   } catch {
     return undefined;
   }
@@ -291,7 +303,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     options.onEvent?.({ type: 'mount:start', total: folders.length });
     if (osInfo.isWindows) {
       credentials = await resolveCredentials(options, osInfo, baseRemotePath);
-      const winPrefix = prefix ? `\\${prefix.replace(/^[\\/]+|[\\/]+$/g, '')}` : '';
+      const winPrefix = prefix ? `\\${trimSlashes(prefix)}` : '';
       for (let i = 0; i < folders.length; i++) {
         const folder = folders[i];
         const folderRemotePath = `${baseRemotePath}${winPrefix}\\${folder.id}`;
@@ -314,8 +326,8 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     } else {
       // nix: connect to the share root once, then alias each subfolder into it.
       const sharePath = prefix ? `${baseRemotePath}/${prefix}` : baseRemotePath;
-      const server = baseRemotePath.replace(/^smb:\/\//, '').replace(/\/.*$/, '');
-      const share = prefix || sharePath.replace(/^smb:\/\//, '').replace(/^[^/]*\/?/, '');
+      const server = baseRemotePath.replace(/^smb:\/\//, '').split('/')[0];
+      const share = prefix || sharePath.replace(/^smb:\/\//, '').split('/').slice(1).join('/');
       const mountDirName = (prefix || share || 'share').replace(/[\\/]+/g, '_') || 'share';
 
       // Reuse an existing mount (prior run or Finder /Volumes mount) to avoid re-auth.
