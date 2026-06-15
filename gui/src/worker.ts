@@ -1,5 +1,5 @@
 import { parentPort } from 'worker_threads';
-import { refresh, reset, getOs, clearCredentialsFromKeychain, saveCredentialsToKeychain } from 'rdss-folder-mapper';
+import { refresh, reset, getOs, clearCredentialsFromKeychain, saveCredentialsToKeychain, formatRemoteBase } from 'rdss-folder-mapper';
 import type { RefreshEvent, Credentials } from 'rdss-folder-mapper';
 
 const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, '');
@@ -79,7 +79,16 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
     } else if (type === 'reset') {
       reset(config.debug, config.baseDir, getOs());
     } else if (type === 'clear-auth') {
-      clearCredentialsFromKeychain(config.debug, getOs());
+      const osInfo = getOs();
+      // macOS stores the SMB password as a native Internet password keyed by
+      // server, so derive the server to clear the right keychain item.
+      const server =
+        osInfo.isMac && config.remotePath
+          ? formatRemoteBase(config.remotePath, osInfo)
+              .replace(/^smb:\/\//, '')
+              .replace(/\/.*$/, '')
+          : undefined;
+      clearCredentialsFromKeychain(config.debug, osInfo, server);
     } else if (type === 'save-credentials') {
       saveCredentialsToKeychain(
         { username: config.username, password: config.password, adDomain: config.adDomain },

@@ -512,6 +512,27 @@ describe('mount.ts unit tests', () => {
       expect((calls[1][1] as string[])[0]).toBe('smb://user:pw@host/projects');
     });
 
+    it('macOS: embeds probeUsername in the credential-free probe URL', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(child_process.execFileSync).mockReturnValue(undefined as any);
+
+      mountNixShare({
+        remotePath: 'smb://host/projects',
+        mountPath: '/base/.mounts/projects',
+        probeUsername: 'alice@qut.edu.au',
+        osInfo: macOs(),
+      });
+
+      const calls = vi.mocked(child_process.execFileSync).mock.calls;
+      expect(calls).toHaveLength(1);
+      // The probe carries the username (URL-encoded) but no password, so the OS
+      // resolves the saved SMB Internet password for that account.
+      expect(calls[0][1]).toEqual([
+        'smb://alice%40qut.edu.au@host/projects',
+        '/base/.mounts/projects',
+      ]);
+    });
+
     it('Linux: mounts via sudo mount -t cifs with an argument array', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(child_process.execFileSync).mockReturnValue(undefined as any);

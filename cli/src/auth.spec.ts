@@ -2,9 +2,8 @@ import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi, t
 import signale from 'signale';
 import http from 'http';
 import os from 'os';
-import { execSync, execFileSync } from 'child_process';
-import { performLogin, redactHeaders, setupFetchMiddleware } from './auth';
-import { getOs } from './os';
+import { execSync } from 'child_process';
+import { performLogin, redactHeaders, setupFetchMiddleware, getCachedToken, setCachedToken } from './auth';
 
 vi.mock('os');
 vi.mock('child_process');
@@ -31,46 +30,45 @@ describe('auth performLogin', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setCachedToken(undefined);
   });
 
   afterEach(() => {
     process.exitCode = undefined;
   });
 
-  it('should return valid token from keychain on non-Windows', async () => {
+  it('returns a valid cached token from memory without re-authenticating', async () => {
     vi.mocked(os.platform).mockReturnValue('darwin');
     const futureExp = Math.floor(Date.now() / 1000) + 3600;
     const validPayload = Buffer.from(JSON.stringify({ exp: futureExp })).toString('base64');
     const validToken = `header.${validPayload}.signature`;
 
-    vi.mocked(execSync).mockReturnValue(validToken as any);
+    setCachedToken(validToken);
 
     const token = await performLogin({
       authDomain: 'auth',
       clientId: 'client',
       callbackUrls: ['http://localhost:3001/'],
       debug: true,
-    }, getOs());
+    });
 
     expect(token).toBe(validToken);
-    expect(execSync).toHaveBeenCalledWith(
-      expect.stringContaining('security find-generic-password'),
-      expect.any(Object),
-    );
   });
 
-  it('persists the token via the Windows Credential Manager after login', async () => {
+  it('caches the token in memory after login (never written to disk/keychain)', async () => {
     vi.mocked(os.platform).mockReturnValue('win32');
-    // No existing token in the vault — PasswordVault read returns nothing.
-    vi.mocked(execFileSync).mockReturnValue(undefined as never);
 
     const errorSpy = vi.spyOn(signale, 'error').mockImplementation(() => {});
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
+    const futureExp = Math.floor(Date.now() / 1000) + 3600;
+    const payload = Buffer.from(JSON.stringify({ exp: futureExp })).toString('base64');
+    const freshToken = `header.${payload}.signature`;
+
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       headers: { entries: () => [] },
-      json: async () => ({ id_token: 'windows_token' }),
+      json: async () => ({ id_token: freshToken }),
     } as any);
 
     const loginPromise = performLogin({
@@ -78,7 +76,7 @@ describe('auth performLogin', () => {
       clientId: 'client',
       callbackUrls: ['http://127.0.0.1:3002/'],
       debug: true,
-    }, getOs());
+    });
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -87,38 +85,22 @@ describe('auth performLogin', () => {
     });
 
     const token = await loginPromise;
-    expect(token).toBe('windows_token');
-    // The macOS `security` command is never used on Windows.
-    expect(execSync).not.toHaveBeenCalledWith(
-      expect.stringContaining('security find-generic-password'),
-      expect.any(Object),
-    );
-    // The token is saved through PowerShell PasswordVault.
-    const savedToVault = vi
-      .mocked(execFileSync)
-      .mock.calls.some(
-        (c) =>
-          c[0] === 'powershell' &&
-          (c[1] as string[]).join(' ').includes('windows_token'),
-      );
-    expect(savedToVault).toBe(true);
+    expect(token).toBe(freshToken);
+    // The token is held in the in-memory cache, not persisted anywhere.
+    expect(getCachedToken()).toBe(freshToken);
+    expect(execSync).not.toHaveBeenCalled();
 
     errorSpy.mockRestore();
     exitSpy.mockRestore();
   });
 
-  it('should fetch new token if keychain token is expired', async () => {
+  it('should fetch new token if cached token is expired', async () => {
     vi.mocked(os.platform).mockReturnValue('darwin');
     const pastExp = Math.floor(Date.now() / 1000) - 3600;
     const expiredPayload = Buffer.from(JSON.stringify({ exp: pastExp })).toString('base64');
     const expiredToken = `header.${expiredPayload}.signature`;
 
-    vi.mocked(execSync).mockImplementation((cmd: string) => {
-      if (cmd.includes('find-generic-password') && cmd.includes('-w')) {
-        return expiredToken as any;
-      }
-      return Buffer.from('') as any;
-    });
+    setCachedToken(expiredToken);
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -131,7 +113,7 @@ describe('auth performLogin', () => {
       clientId: 'client',
       callbackUrls: ['http://127.0.0.1:3003/'],
       debug: true,
-    }, getOs());
+    });
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -143,15 +125,8 @@ describe('auth performLogin', () => {
     expect(token).toBe('new_valid_token');
   });
 
-  it('should fetch new token if no token exists in keychain', async () => {
+  it('should fetch new token if no token is cached', async () => {
     vi.mocked(os.platform).mockReturnValue('darwin');
-
-    vi.mocked(execSync).mockImplementation((cmd: string) => {
-      if (cmd.includes('find-generic-password')) {
-        throw new Error('Not found');
-      }
-      return Buffer.from('') as any;
-    });
 
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -164,7 +139,7 @@ describe('auth performLogin', () => {
       clientId: 'client',
       callbackUrls: ['http://127.0.0.1:3004/'],
       debug: true,
-    }, getOs());
+    });
 
     await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -210,7 +185,7 @@ describe('auth – C3: callback server binds to 127.0.0.1', () => {
       clientId: 'client',
       callbackUrls: ['http://evil.attacker.com:9999/callback'],
       debug: false,
-    }, getOs());
+    });
 
     expect(result).toBeUndefined();
     expect(process.exitCode).toBe(1);
@@ -234,7 +209,7 @@ describe('auth – C3: callback server binds to 127.0.0.1', () => {
       clientId: 'client',
       callbackUrls: ['http://127.0.0.1:3010/'],
       debug: false,
-    }, getOs());
+    });
 
     await new Promise((r) => setTimeout(r, 300));
     await new Promise<void>((resolve, reject) => {
@@ -283,7 +258,7 @@ describe('auth – C4: PKCE in authorization code flow', () => {
       clientId: 'client',
       callbackUrls: ['http://127.0.0.1:3011/'],
       debug: false,
-    }, getOs());
+    });
 
     await new Promise((r) => setTimeout(r, 300));
     await new Promise<void>((resolve, reject) => {

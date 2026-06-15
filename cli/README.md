@@ -90,13 +90,13 @@ Options:
   -t, --truncate <number>    Truncate length for folder names (default: 40)
   --refresh                  Force login and fetch plans from DMP even if folders.json exists
   --dmp-base-url <url>       Base URL for DMP to fetch config
-  --force                    Ignore existing token in keychain and force a new login
+  --force                    Ignore the in-memory token and force a new login
   -h, --help                 display help for command
 
 Commands:
   reset                      Remove all currently mapped folders
-  auth                       Set credentials in the keychain
-  clear-auth                 Clear all credentials from the keychain
+  auth                       Store SMB credentials for connecting to the RDSS share
+  clear-auth                 Clear stored SMB credentials
 ```
 
 ### Refresh (default)
@@ -117,12 +117,23 @@ rdss-folder-mapper reset
 
 ### Authentication
 
-Store credentials in the system keychain (macOS Keychain / Windows Credential Manager / Linux secret-tool):
+How SMB credentials are handled depends on the platform:
+
+- **macOS**: `auth` saves an SMB **Internet password** to the login keychain so
+  the OS re-authenticates natively (no app-owned credential is stored). The
+  username is read back from that keychain item on subsequent runs.
+- **Linux**: `auth` stores the username/password/domain via `secret-tool`
+  (Secret Service).
+- **Windows**: the RDSS share is accessed with your logged-in session identity,
+  so there is nothing to store — `auth` and `clear-auth` are informational.
 
 ```bash
 rdss-folder-mapper auth
 rdss-folder-mapper clear-auth
 ```
+
+The OAuth token used to fetch plans from the DMP is held **in memory only** for
+the duration of the process — it is never written to disk or the keychain.
 
 ## Configuration (`config.json`)
 
@@ -152,8 +163,10 @@ can still override per platform with `remotePathNix` / `remotePathWin` and
 - **macOS / Linux**: the share `host/prefix` is mounted **once** at
   `<baseDir>/.mounts/<prefix>`, and each folder `id` is aliased from
   `<baseDir>/<Name [id]>` to `.mounts/<prefix>/<id>`. This avoids repeated
-  authentication prompts. On macOS the share credential is also saved as a
-  keychain Internet password so Finder re-authenticates silently.
+  authentication prompts. On macOS the connection first tries the saved Internet
+  password (no prompt); on a fresh machine you supply credentials once (via
+  `auth` or the GUI prompt) and they are saved as an Internet password so future
+  runs — and Finder — re-authenticate silently.
 - **Windows**: each folder is mapped individually at `\\host\prefix\<id>`.
 
 ## Remote Configuration & OAuth Login

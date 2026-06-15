@@ -18,8 +18,7 @@ describe('loadFoldersConfig', () => {
         ),
     });
 
-    const osInfo = { isMac: true, isWindows: false, isLinux: false, osType: 'darwin' as const };
-    const folders = await loadFoldersConfig('https://example.com/folders.json', false, osInfo as any);
+    const folders = await loadFoldersConfig('https://example.com/folders.json', false);
     expect(folders).toHaveLength(1);
     expect(folders[0].id).toBe('abc');
   });
@@ -31,8 +30,7 @@ describe('loadFoldersConfig', () => {
         Promise.resolve(JSON.stringify([{ id: 'flat', title: 'Flat Project' }])),
     });
 
-    const osInfo = { isMac: true, isWindows: false, isLinux: false, osType: 'darwin' as const };
-    const folders = await loadFoldersConfig('https://example.com/folders.json', false, osInfo as any);
+    const folders = await loadFoldersConfig('https://example.com/folders.json', false);
     expect(folders).toHaveLength(1);
     expect(folders[0].id).toBe('flat');
   });

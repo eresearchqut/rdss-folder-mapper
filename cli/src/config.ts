@@ -1,19 +1,17 @@
 import fs from 'fs';
 import signale from 'signale';
 import { FolderMapping } from './mapper';
-import { getTokenFromKeychain } from './secrets';
-import { OsInfo } from './os';
+import { getCachedToken } from './auth';
 
 export const loadFoldersConfig = async (
   foldersFile: string,
   debug: boolean,
-  osInfo: OsInfo,
 ): Promise<FolderMapping[]> => {
   try {
     let fileData: string;
     if (foldersFile.startsWith('http://') || foldersFile.startsWith('https://')) {
       if (debug) signale.debug(`Fetching folders config from ${foldersFile}...`);
-      const token = getTokenFromKeychain(debug, osInfo);
+      const token = getCachedToken();
       const headers: Record<string, string> = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
