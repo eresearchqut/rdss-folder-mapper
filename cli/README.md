@@ -6,7 +6,9 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 
 - **Windows**: Windows 10/11
 - **macOS**: macOS 10.15+ (requires SMB client, usually built-in)
-- **Linux**: Requires `cifs-utils` or `smbclient` installed on the system.
+- **Linux**: GVfs (`gio`, usually pre-installed on GNOME/KDE desktops) is used
+  by default; on hosts without it, `cifs-utils` is required for the
+  `sudo mount -t cifs` fallback.
 
 ## Download
 
@@ -122,8 +124,11 @@ How SMB credentials are handled depends on the platform:
 - **macOS**: `auth` saves an SMB **Internet password** to the login keychain so
   the OS re-authenticates natively (no app-owned credential is stored). The
   username is read back from that keychain item on subsequent runs.
-- **Linux**: `auth` stores the username/password/domain via `secret-tool`
-  (Secret Service).
+- **Linux**: when mounting through GVfs (`gio`, the default on desktop Linux),
+  credentials are handled by the desktop and stored in the GNOME keyring, so
+  `auth` is not required. On hosts without GVfs the CLI falls back to a
+  `sudo mount -t cifs` mount, for which `auth` stores the
+  username/password/domain via `secret-tool` (Secret Service).
 - **Windows**: the RDSS share is accessed with your logged-in session identity,
   so there is nothing to store — `auth` and `clear-auth` are informational.
 
@@ -160,13 +165,15 @@ macOS/Linux and `\\host` on Windows — so a single value works everywhere. (You
 can still override per platform with `hostNix` / `hostWin` and
 `volumeNix` / `volumeWin`, or with `--host` / `--volume`.)
 
-- **macOS / Linux**: the share `host/prefix` is mounted **once** at
-  `<baseDir>/.mounts/<prefix>`, and each folder `id` is aliased from
-  `<baseDir>/<Name [id]>` to `.mounts/<prefix>/<id>`. This avoids repeated
-  authentication prompts. On macOS the connection first tries the saved Internet
-  password (no prompt); on a fresh machine you supply credentials once (via
-  `auth` or the GUI prompt) and they are saved as an Internet password so future
-  runs — and Finder — re-authenticate silently.
+- **macOS / Linux**: the share `host/prefix` is mounted **once**, and each
+  folder `id` is aliased from `<baseDir>/<Name [id]>` to `<mount>/<id>`. This
+  avoids repeated authentication prompts. On **macOS** the share is mounted via
+  Finder/NetFS (`osascript`), so macOS handles authentication and offers to save
+  the password in your keychain for silent reuse. On **Linux** the share is
+  mounted via GVfs (`gio mount`) into your user session — no `sudo`, with the
+  desktop prompting once and storing the password in the GNOME keyring; if GVfs
+  is unavailable the CLI falls back to `sudo mount -t cifs` at
+  `<baseDir>/.mounts/<prefix>` using credentials from `secret-tool` (or a prompt).
 - **Windows**: each folder is mapped individually at `\\host\prefix\<id>`.
 
 ## Remote Configuration & OAuth Login

@@ -34,6 +34,9 @@ import {
   findExistingSmbMount,
   mountNixShare,
   mountMacViaFinder,
+  mountLinuxViaGio,
+  findGvfsMount,
+  isCommandAvailable,
   aliasSubfolder,
   handleMountError,
 } from './mount';
@@ -340,31 +343,56 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
           return;
         }
       } else {
-        // Linux: mount the share once with credentials from secret-tool (or a prompt).
-        baseMountPath = path.join(mountsDir, mountDirName);
-        if (!isMounted(baseMountPath, baseMountPath, osInfo)) {
-          signale.info(`Mounting share ${sharePath} to ${baseMountPath}`);
-          credentials = await resolveCredentials(options, osInfo, baseRemotePath);
+        // Linux: prefer gio/GVfs (no sudo, desktop keyring, native prompt) — the
+        // direct equivalent of the macOS Finder mount. Fall back to a credentialed
+        // `sudo mount -t cifs` when gio/GVfs is unavailable (e.g. headless hosts).
+        const gvfsMount = findGvfsMount(server, share, debug);
+        if (gvfsMount) {
+          if (debug) signale.debug(`Reusing existing GVfs mount at ${gvfsMount}`);
+          baseMountPath = gvfsMount;
+        } else if (isCommandAvailable('gio')) {
+          signale.info(`Mounting share ${sharePath} via GVfs (gio)`);
           try {
-            mountNixShare({
-              remotePath: sharePath,
-              mountPath: baseMountPath,
-              credentials,
-              debug,
-              osInfo,
-            });
+            mountLinuxViaGio(sharePath, debug);
           } catch (error: unknown) {
-            handleMountError(
-              error,
-              sharePath,
-              baseMountPath,
-              baseMountPath,
-              credentials?.password,
-              debug,
-              osInfo,
-            );
+            handleMountError(error, sharePath, '/run/user', '/run/user', undefined, debug, osInfo);
             options.onEvent?.({ type: 'mount:complete' });
             return;
+          }
+          baseMountPath = findGvfsMount(server, share, debug);
+          if (!baseMountPath) {
+            process.exitCode = 1;
+            signale.error(`Could not locate the mounted share for ${sharePath} after mounting.`);
+            options.onEvent?.({ type: 'mount:complete' });
+            return;
+          }
+        } else {
+          // Fallback: mount the share once with credentials from secret-tool (or a prompt).
+          baseMountPath = path.join(mountsDir, mountDirName);
+          if (!isMounted(baseMountPath, baseMountPath, osInfo)) {
+            signale.info(`Mounting share ${sharePath} to ${baseMountPath}`);
+            credentials = await resolveCredentials(options, osInfo, baseRemotePath);
+            try {
+              mountNixShare({
+                remotePath: sharePath,
+                mountPath: baseMountPath,
+                credentials,
+                debug,
+                osInfo,
+              });
+            } catch (error: unknown) {
+              handleMountError(
+                error,
+                sharePath,
+                baseMountPath,
+                baseMountPath,
+                credentials?.password,
+                debug,
+                osInfo,
+              );
+              options.onEvent?.({ type: 'mount:complete' });
+              return;
+            }
           }
         }
       }
