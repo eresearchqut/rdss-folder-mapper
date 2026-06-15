@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, screen } from 'electron';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -312,6 +312,23 @@ ipcMain.handle('get-config', () => loadConfig());
 ipcMain.handle('get-config-sources', () => getConfigSources());
 
 ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
+
+// Lets the renderer grow/shrink the window to fit its visible content. Width is
+// kept fixed; height is clamped to the work area so the window never exceeds the
+// screen. Used to make the settings page adaptive as diagnostics are revealed.
+ipcMain.handle('resize-content-height', (_event, contentHeight: number) => {
+  if (!mainWindow || typeof contentHeight !== 'number' || !Number.isFinite(contentHeight)) return;
+  const [width] = mainWindow.getContentSize();
+  const workAreaHeight = screen.getDisplayMatching(mainWindow.getBounds()).workArea.height;
+  const height = Math.round(Math.min(Math.max(contentHeight, 360), workAreaHeight - 40));
+  if (mainWindow.getContentSize()[1] === height) return;
+  // The window is non-user-resizable; macOS ignores programmatic resizes while
+  // resizable is false, so toggle it just for this call. Width stays fixed.
+  const wasResizable = mainWindow.isResizable();
+  if (!wasResizable) mainWindow.setResizable(true);
+  mainWindow.setContentSize(width, height);
+  if (!wasResizable) mainWindow.setResizable(false);
+});
 
 ipcMain.handle('open-config-file', async (_event, filePath: string) => {
   // Only allow opening a path that is a known, currently-loaded config source,

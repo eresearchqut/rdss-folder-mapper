@@ -527,6 +527,47 @@
     // Number of folders mapped from the retrieved folders.json (from the latest 'plans:fetched' event).
     let mappedFolderCount = null;
 
+    const topbar = document.querySelector('.topbar');
+
+    // Any content change in either panel (sections shown/hidden, status text,
+    // help card, diagnostics) can alter the natural height, so re-fit on mutation.
+    const panelResizeObserver = new MutationObserver(() => requestResize());
+    const observePanels = () =>
+      document.querySelectorAll('.panel').forEach(panel =>
+        panelResizeObserver.observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] }));
+
+    // Measure a panel's natural content height. The panels flex to fill the
+    // window and use margin-top:auto to anchor footers, which inflates
+    // scrollHeight; collapsing the flex fill briefly yields the true height so
+    // the window can both grow and shrink to fit. The observer is detached around
+    // the temporary style writes so they don't retrigger a measurement loop.
+    const measurePanelHeight = (panel) => {
+      panelResizeObserver.disconnect();
+      const prevFlex = panel.style.flex;
+      const prevHeight = panel.style.height;
+      panel.style.flex = '0 0 auto';
+      panel.style.height = 'auto';
+      const height = panel.scrollHeight;
+      panel.style.flex = prevFlex;
+      panel.style.height = prevHeight;
+      observePanels();
+      return height;
+    };
+
+    let resizeQueued = false;
+    const requestResize = () => {
+      if (resizeQueued) return;
+      resizeQueued = true;
+      requestAnimationFrame(() => {
+        resizeQueued = false;
+        const panel = document.querySelector('.panel:not(.hidden)');
+        if (!panel) return;
+        window.api.resizeContentHeight(topbar.offsetHeight + measurePanelHeight(panel));
+      });
+    };
+
+    observePanels();
+
     const refreshRemoveButton = () =>
       window.api.hasShortcuts().then(has => { btnRemove.classList.toggle('hidden', !has); });
 
@@ -660,6 +701,7 @@
       } catch {
         configSources.textContent = 'Unable to determine config sources.';
       }
+      requestResize();
     };
 
     const renderResolvedConfig = async () => {
@@ -669,6 +711,7 @@
       } catch {
         resolvedConfig.textContent = 'Unable to determine resolved config.';
       }
+      requestResize();
     };
 
     // Tab switching for the Configuration diagnostics (Sources / Resolved).
@@ -679,6 +722,7 @@
           b.classList.toggle('active', b.dataset.tab === target));
         configDiagnosticsRow.querySelectorAll('.tab-panel').forEach(p =>
           p.classList.toggle('hidden', p.dataset.tab !== target));
+        requestResize();
       });
     });
 
@@ -691,6 +735,7 @@
         renderConfigSources();
         renderResolvedConfig();
       }
+      requestResize();
     };
 
     chkDebug.addEventListener('change', updateConfigSourcesVisibility);
@@ -705,6 +750,7 @@
         panelSettings.classList.remove('hidden');
         btnSettings.classList.add('active');
         refreshClearKeychainButton();
+        requestResize();
       });
     };
 
@@ -712,6 +758,7 @@
       panelSettings.classList.add('hidden');
       panelMain.classList.remove('hidden');
       btnSettings.classList.remove('active');
+      requestResize();
     };
 
     btnSettings.addEventListener('click', () => {
@@ -809,6 +856,9 @@
       refreshRemoveButton();
       refreshLocationChip();
     });
+
+    // Fit the window to the initial main panel once the first layout has painted.
+    requestResize();
   </script>
 </body>
 </html>

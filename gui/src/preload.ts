@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('api', {
   getResolvedConfig: (): Promise<Record<string, unknown>> =>
     ipcRenderer.invoke('get-resolved-config'),
 
+  resizeContentHeight: (height: number): Promise<void> =>
+    ipcRenderer.invoke('resize-content-height', height),
+
   saveConfig: (config: Config): Promise<void> => ipcRenderer.invoke('save-config', config),
 
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
