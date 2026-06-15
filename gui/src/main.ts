@@ -210,6 +210,12 @@ const deploymentServer = (): string | undefined => {
     .split('/')[0];
 };
 
+/** Append a line to the activity log and forward it to the renderer. */
+const appendLog = (line: string) => {
+  logLines.push(line);
+  mainWindow?.webContents.send('log', line);
+};
+
 /**
  * Runs 'refresh', 'reset', or 'clear-auth' in a worker thread so the main
  * process event loop (and therefore the renderer) stays responsive during
@@ -220,6 +226,15 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
     const deployConfig = loadDeploymentConfig();
     const deployRemotePath = deployConfig.host;
     const deployRemotePrefix = deployConfig.volume;
+
+    if (config.debug) {
+      const loaded = getConfigSources().filter(source => source.loaded);
+      if (loaded.length === 0) {
+        appendLog('⬤ debug   No config file found; using built-in defaults.');
+      } else {
+        loaded.forEach(source => appendLog(`⬤ debug   Loaded ${source.label} from ${source.path}`));
+      }
+    }
 
     const workerConfig = {
       ...deployConfig,
