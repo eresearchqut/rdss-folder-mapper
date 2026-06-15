@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { Worker } from 'worker_threads';
-import { BASE_DIR, formatRemoteBase, getMacInternetPasswordAccount, getOs } from 'rdss-folder-mapper';
+import { BASE_DIR, formatRemoteBase, getCredentialsFromKeychain, getMacInternetPasswordAccount, getOs } from 'rdss-folder-mapper';
 
 let mainWindow: BrowserWindow | null = null;
 let activeWorker: import('worker_threads').Worker | null = null;
@@ -146,6 +146,21 @@ app.on('window-all-closed', () => {
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Derive the SMB server (host, without scheme or share) from the deployment
+ * config, used to look up the platform-native keychain entry. Returns undefined
+ * when no host is configured.
+ */
+const deploymentServer = (): string | undefined => {
+  const deployConfig = loadDeploymentConfig();
+  const isWin = process.platform === 'win32';
+  const host = deployConfig.host ?? (isWin ? deployConfig.hostWin : deployConfig.hostNix);
+  if (!host) return undefined;
+  return formatRemoteBase(host, getOs())
+    .replace(/^smb:\/\//, '')
+    .replace(/\/.*$/, '');
+};
 
 /**
  * Runs 'refresh', 'reset', or 'clear-auth' in a worker thread so the main
@@ -329,6 +344,24 @@ ipcMain.handle('remove-mappings', async () => {
 ipcMain.handle('clear-auth', async () => {
   cachedToken = undefined;
   return runInWorker('clear-auth', loadConfig());
+});
+
+/**
+ * Reports whether any app-relevant credentials are stored in the OS keychain, so
+ * the renderer can show a "Clear Key Chain" button only when there is something
+ * to clear. Windows uses the session identity (nothing stored) so always false.
+ */
+ipcMain.handle('has-stored-credentials', async () => {
+  const cfg = loadConfig();
+  const osInfo = getOs();
+  if (osInfo.isWindows) return false;
+  if (osInfo.isMac) {
+    const server = deploymentServer();
+    if (!server) return false;
+    return !!getMacInternetPasswordAccount(server, cfg.debug ?? false);
+  }
+  const creds = getCredentialsFromKeychain(cfg.debug ?? false, osInfo);
+  return !!(creds.username || creds.password);
 });
 
 ipcMain.handle('submit-credentials', async (_event, credentials: { username: string; password: string; domain?: string }) => {
