@@ -16,6 +16,9 @@ import {
   buildLinuxCifsMount,
   findExistingSmbMount,
   mountNixShare,
+  mountLinuxViaGio,
+  findGvfsMount,
+  isCommandAvailable,
   aliasSubfolder,
   resetMountsDir,
   isWindowsShareAccessible,
@@ -465,6 +468,84 @@ describe('mount.ts unit tests', () => {
         '/dev/disk1s1 on / (apfs, local)\n' as any,
       );
       expect(findExistingSmbMount('rstore.qut.edu.au', 'projects')).toBeUndefined();
+    });
+  });
+
+  describe('isCommandAvailable', () => {
+    const originalPath = process.env.PATH;
+    afterEach(() => {
+      process.env.PATH = originalPath;
+    });
+
+    it('returns true when an executable is found on PATH', () => {
+      process.env.PATH = '/usr/bin:/usr/local/bin';
+      vi.mocked(fs.accessSync).mockImplementation((p) => {
+        if (p === '/usr/local/bin/gio') return;
+        throw new Error('not found');
+      });
+      expect(isCommandAvailable('gio')).toBe(true);
+    });
+
+    it('returns false when the executable is not on PATH', () => {
+      process.env.PATH = '/usr/bin:/usr/local/bin';
+      vi.mocked(fs.accessSync).mockImplementation(() => {
+        throw new Error('not found');
+      });
+      expect(isCommandAvailable('gio')).toBe(false);
+    });
+  });
+
+  describe('mountLinuxViaGio', () => {
+    it('invokes `gio mount` with the smb url and inherited stdio', () => {
+      mountLinuxViaGio('smb://rstore.qut.edu.au/projects');
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+        'gio',
+        ['mount', 'smb://rstore.qut.edu.au/projects'],
+        { stdio: 'inherit' },
+      );
+    });
+  });
+
+  describe('findGvfsMount', () => {
+    const realGetuid = process.getuid;
+    beforeEach(() => {
+      process.getuid = () => 1000;
+    });
+    afterEach(() => {
+      process.getuid = realGetuid;
+    });
+
+    it('locates a GVfs mount by server and share', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'smb-share:server=rstore.qut.edu.au,share=projects',
+      ] as any);
+      expect(findGvfsMount('rstore.qut.edu.au', 'projects')).toBe(
+        '/run/user/1000/gvfs/smb-share:server=rstore.qut.edu.au,share=projects',
+      );
+    });
+
+    it('matches the encoded port when the server includes one', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'smb-share:server=localhost,share=test_share,port=4455',
+      ] as any);
+      expect(findGvfsMount('localhost:4455', 'test_share')).toBe(
+        '/run/user/1000/gvfs/smb-share:server=localhost,share=test_share,port=4455',
+      );
+    });
+
+    it('returns undefined when no entry matches', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readdirSync).mockReturnValue([
+        'smb-share:server=other.example.com,share=projects',
+      ] as any);
+      expect(findGvfsMount('rstore.qut.edu.au', 'projects')).toBeUndefined();
+    });
+
+    it('returns undefined when the gvfs directory does not exist', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      expect(findGvfsMount('rstore.qut.edu.au', 'projects')).toBeUndefined();
     });
   });
 

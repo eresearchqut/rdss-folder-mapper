@@ -441,6 +441,83 @@ export const mountMacViaFinder = (smbUrl: string, debug = false): void => {
   execFileSync('osascript', ['-e', script], { stdio: debug ? 'pipe' : 'ignore' });
 };
 
+/**
+ * Returns true if an executable named `cmd` is found on the current PATH,
+ * without spawning a process. Used to detect optional tooling such as `gio`.
+ */
+export const isCommandAvailable = (cmd: string): boolean => {
+  const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  return dirs.some((dir) => {
+    try {
+      fs.accessSync(path.join(dir, cmd), fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+};
+
+/**
+ * Linux (GVfs) equivalent of the macOS Finder mount: mount an SMB share through
+ * `gio mount`, which mounts into the user session (no sudo) and lets the desktop
+ * handle authentication, prompting and credential storage in the GNOME keyring
+ * (reused silently afterwards). The share is mounted under
+ * /run/user/<uid>/gvfs/smb-share:...; callers locate it with findGvfsMount.
+ * stdio is inherited so an interactive terminal password prompt still works.
+ * Throws if the user cancels or authentication fails.
+ */
+export const mountLinuxViaGio = (smbUrl: string, debug = false): void => {
+  if (debug) signale.debug(`Executing: gio mount "${smbUrl}"`);
+  execFileSync('gio', ['mount', smbUrl], { stdio: 'inherit' });
+};
+
+/**
+ * Locate an active GVfs SMB mount for the given server/share. GVfs mounts do not
+ * appear as //server/share in the `mount` table (they surface as a single
+ * gvfsd-fuse entry), so they are found by inspecting the per-user gvfs directory,
+ * whose entries are named `smb-share:server=<host>,share=<share>[,port=...][,user=...]`.
+ * Any port encoded in `server` (host:port) must match the entry's port field.
+ */
+export const findGvfsMount = (
+  server: string,
+  share: string,
+  debug = false,
+): string | undefined => {
+  try {
+    const uid = process.getuid?.();
+    if (uid === undefined) return undefined;
+    const gvfsDir = `/run/user/${uid}/gvfs`;
+    if (!fs.existsSync(gvfsDir)) return undefined;
+
+    const portMatch = server.match(/:(\d+)$/);
+    const wantPort = portMatch ? portMatch[1] : undefined;
+    const wantHost = server.replace(/:\d+$/, '').toLowerCase();
+    const wantShare = share.toLowerCase();
+
+    for (const entry of fs.readdirSync(gvfsDir)) {
+      if (!entry.startsWith('smb-share:')) continue;
+      const fields = new Map(
+        entry
+          .slice('smb-share:'.length)
+          .split(',')
+          .map((kv) => {
+            const idx = kv.indexOf('=');
+            return [kv.slice(0, idx).toLowerCase(), kv.slice(idx + 1)] as [string, string];
+          }),
+      );
+      if ((fields.get('server') || '').toLowerCase() !== wantHost) continue;
+      if ((fields.get('share') || '').toLowerCase() !== wantShare) continue;
+      if (wantPort && fields.get('port') && fields.get('port') !== wantPort) continue;
+      const full = path.join(gvfsDir, entry);
+      if (debug) signale.debug(`Reusing existing GVfs mount at ${full}`);
+      return full;
+    }
+  } catch (e) {
+    if (debug) signale.debug('Could not inspect GVfs mounts:', (e as Error).message);
+  }
+  return undefined;
+};
+
 export interface SubfolderAliasOptions {
   folderMapping: FolderMapping;
   baseDir: string;

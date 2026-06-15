@@ -22,7 +22,7 @@ A monorepo containing the CLI tool and desktop GUI for mapping RDSS research sto
 
 - **Windows**: Windows 10/11
 - **macOS**: macOS 10.15+ (SMB client built-in)
-- **Linux**: Requires `cifs-utils` installed
+- **Linux**: GVfs (`gio`) by default; `cifs-utils` for the non-GVfs fallback
 
 ## Quick Start — GUI (Recommended for researchers)
 
