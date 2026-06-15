@@ -291,6 +291,17 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 11px; color: var(--qut-text); white-space: pre; line-height: 1.4;
     }
+
+    .tabset { display: flex; flex-direction: column; gap: 8px; }
+    .tab-buttons { display: flex; gap: 4px; border-bottom: 1px solid var(--qut-border); }
+    .tab-btn {
+      appearance: none; background: none; border: none; cursor: pointer;
+      padding: 6px 12px; margin-bottom: -1px; font-size: 12px; font-weight: 600;
+      color: var(--qut-subtle); border-bottom: 2px solid transparent;
+    }
+    .tab-btn:hover { color: var(--qut-text); }
+    .tab-btn.active { color: var(--qut-blue); border-bottom-color: var(--qut-blue); }
+    .tab-panel.hidden { display: none; }
   </style>
 </head>
 <body>
@@ -375,16 +386,22 @@
       </label>
     </div>
 
-    <div class="field hidden" id="configSourcesRow">
-      <label>Configuration sources</label>
-      <div class="config-sources" id="configSources"></div>
-      <div class="hint">Config files the app reads, in priority order (later overrides earlier). Click a loaded path to open it.</div>
-    </div>
-
-    <div class="field hidden" id="resolvedConfigRow">
-      <label>Resolved configuration</label>
-      <pre class="resolved-config" id="resolvedConfig"></pre>
-      <div class="hint">The effective config the app runs with after merging all sources.</div>
+    <div class="field hidden" id="configDiagnosticsRow">
+      <label>Configuration</label>
+      <div class="tabset">
+        <div class="tab-buttons" role="tablist">
+          <button type="button" class="tab-btn active" data-tab="sources" role="tab">Sources</button>
+          <button type="button" class="tab-btn" data-tab="resolved" role="tab">Resolved</button>
+        </div>
+        <div class="tab-panel" data-tab="sources" role="tabpanel">
+          <div class="config-sources" id="configSources"></div>
+          <div class="hint">Config files the app reads, in priority order (later overrides earlier). Click a loaded path to open it.</div>
+        </div>
+        <div class="tab-panel hidden" data-tab="resolved" role="tabpanel">
+          <pre class="resolved-config" id="resolvedConfig"></pre>
+          <div class="hint">The effective config the app runs with after merging all sources.</div>
+        </div>
+      </div>
     </div>
 
     <div class="settings-actions">
@@ -486,9 +503,8 @@
     const locationPath  = document.getElementById('locationPath');
     const inputBaseDir   = document.getElementById('inputBaseDir');
     const chkDebug      = document.getElementById('chkDebug');
-    const configSourcesRow = document.getElementById('configSourcesRow');
+    const configDiagnosticsRow = document.getElementById('configDiagnosticsRow');
     const configSources    = document.getElementById('configSources');
-    const resolvedConfigRow = document.getElementById('resolvedConfigRow');
     const resolvedConfig    = document.getElementById('resolvedConfig');
     const btnBrowse     = document.getElementById('btnBrowse');
     const btnSave       = document.getElementById('btnSave');
@@ -655,12 +671,22 @@
       }
     };
 
-    // The config-sources row is a debug-only diagnostic; show it whenever debug
-    // logging is enabled and refresh its contents when revealed.
+    // Tab switching for the Configuration diagnostics (Sources / Resolved).
+    configDiagnosticsRow.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.tab;
+        configDiagnosticsRow.querySelectorAll('.tab-btn').forEach(b =>
+          b.classList.toggle('active', b.dataset.tab === target));
+        configDiagnosticsRow.querySelectorAll('.tab-panel').forEach(p =>
+          p.classList.toggle('hidden', p.dataset.tab !== target));
+      });
+    });
+
+    // The config diagnostics row is a debug-only diagnostic; show it whenever
+    // debug logging is enabled and refresh its contents when revealed.
     const updateConfigSourcesVisibility = () => {
       const show = chkDebug.checked;
-      configSourcesRow.classList.toggle('hidden', !show);
-      resolvedConfigRow.classList.toggle('hidden', !show);
+      configDiagnosticsRow.classList.toggle('hidden', !show);
       if (show) {
         renderConfigSources();
         renderResolvedConfig();
