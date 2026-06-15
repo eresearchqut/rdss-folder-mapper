@@ -342,6 +342,8 @@ describe('mount.ts unit tests', () => {
       expect(logged).not.toContain(password);
       expect(logged).not.toContain(encodeURIComponent(password));
       expect(logged).toContain('***');
+
+      debugSpy.mockRestore();
     });
   });
 
