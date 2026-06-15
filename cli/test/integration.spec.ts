@@ -40,6 +40,13 @@ describe('Mount Integration Test', () => {
     await container.exec(['mkdir', '-p', '/home/paola']);
     await container.exec(['sh', '-c', 'echo "paola_data" > /home/paola/paola_test.txt']);
     await container.exec(['chown', '-R', 'paola:smb', '/home/paola']);
+
+    // Project subfolders inside the single shared mount (the `test_share` share
+    // maps to /storage). The new nix model mounts the share root once and
+    // aliases these subfolders, so they must exist as real directories.
+    await container.exec(['mkdir', '-p', '/storage/proj_alpha', '/storage/proj_beta']);
+    await container.exec(['sh', '-c', 'echo "alpha_data" > /storage/proj_alpha/alpha.txt']);
+    await container.exec(['sh', '-c', 'echo "beta_data" > /storage/proj_beta/beta.txt']);
   }, 120000);
 
   afterAll(async () => {
@@ -79,6 +86,9 @@ describe('Mount Integration Test', () => {
   describe('CLI mounting', () => {
     const testRdssDir = path.join(process.cwd(), '.test', 'RDSS');
     const mockBinDir = path.join(process.cwd(), '.test', 'bin');
+    // The new nix model mounts a single share (the prefix) once, then aliases
+    // subfolders by id within it. `test_share` is the Samba share name.
+    const remotePrefixNix = 'test_share';
 
     beforeAll(() => {
       fs.mkdirSync(mockBinDir, { recursive: true });
@@ -116,7 +126,7 @@ exit 0
       fs.writeFileSync(
         'folders.json',
         JSON.stringify({
-          folders: [{ id: 'test_share', nickname: 'TestShare' }],
+          folders: [{ id: 'proj_alpha', nickname: 'TestShare' }],
         }),
       );
     });
@@ -144,6 +154,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        REMOTE_PREFIX_NIX: remotePrefixNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -171,6 +182,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        REMOTE_PREFIX_NIX: remotePrefixNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -209,6 +221,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        REMOTE_PREFIX_NIX: remotePrefixNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -246,7 +259,7 @@ exit 0
       fs.writeFileSync(
         customFoldersFile,
         JSON.stringify({
-          folders: [{ id: 'test_share', nickname: 'CustomShare' }],
+          folders: [{ id: 'proj_alpha', nickname: 'CustomShare' }],
         }),
       );
 
@@ -260,6 +273,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        REMOTE_PREFIX_NIX: remotePrefixNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -314,9 +328,10 @@ exit 0
         // Since we are mocking the mount and it might fail, we just make sure the error output
         // mentions mapping the custom path rather than the default env ones
         const outputStr = e.stderr?.toString() || e.stdout?.toString() || e.message;
-        const expectedRemote = isWindows()
-          ? `${customRemotePath}\\test_share`
-          : `${customRemotePath}/test_share`;
+        // With the new nix model the share root is mounted once; without a
+        // prefix the error references the base remote path directly (no
+        // per-folder suffix). Windows still maps per-folder.
+        const expectedRemote = isWindows() ? `${customRemotePath}\\test_share` : customRemotePath;
         expect(outputStr).toContain(`Error: Failed to map ${expectedRemote}`);
       }
     });
@@ -350,7 +365,7 @@ exit 0
         JSON.stringify({
           folders: [
             {
-              id: 'test_share',
+              id: 'proj_alpha',
               title:
                 'This is a very long <title> that should definitely be truncated because it exceeds sixty characters',
             },
@@ -368,6 +383,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
+        REMOTE_PREFIX_NIX: remotePrefixNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -379,7 +395,7 @@ exit 0
         },
       );
 
-      const expectedFolderName = 'This Is A Very Long Title That Should... [test_share]';
+      const expectedFolderName = 'This Is A Very Long Title That Should... [proj_alpha]';
       const localPath = path.join(testRdssDir, expectedFolderName);
 
       expect(fs.existsSync(localPath)).toBe(true);

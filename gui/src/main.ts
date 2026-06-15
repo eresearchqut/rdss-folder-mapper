@@ -32,6 +32,9 @@ interface DeploymentConfig {
   remotePath?: string;
   remotePathNix?: string;
   remotePathWin?: string;
+  remotePrefix?: string;
+  remotePrefixNix?: string;
+  remotePrefixWin?: string;
 }
 
 const configPath = () => path.join(app.getPath('userData'), 'config.json');
@@ -149,12 +152,15 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
     const osInfo = process.platform === 'win32';
     const deployRemotePath = deployConfig.remotePath
       ?? (osInfo ? deployConfig.remotePathWin : deployConfig.remotePathNix);
+    const deployRemotePrefix = deployConfig.remotePrefix
+      ?? (osInfo ? deployConfig.remotePrefixWin : deployConfig.remotePrefixNix);
 
     const workerConfig = {
       ...deployConfig,
       debug: config.debug,
       baseDir: config.baseDir,
       remotePath: deployRemotePath,
+      remotePrefix: deployRemotePrefix,
       foldersFile: path.join(app.getPath('userData'), 'folders.json'),
     };
 

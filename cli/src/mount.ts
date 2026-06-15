@@ -249,22 +249,35 @@ export const mountWindows = (options: MountOptions) => {
   });
 }
 
-export const mountMac = (options: MountOptions) => {
-  const { remotePath, localPath, mountPath, credentials, debug = false } = options;
+/**
+ * Build the `smb://` URL used by `mount_smbfs`, injecting URL-encoded
+ * credentials when supplied. Returns both the real URL and a redacted version
+ * safe for logging.
+ */
+export const buildMacSmbUrl = (
+  remotePath: string,
+  credentials?: Credentials,
+): { url: string; logUrl: string } => {
   const { username, password, adDomain } = credentials || {};
-  let macRemote = remotePath;
-  let macRemoteLog = remotePath;
-  if (username && password && macRemote.startsWith('smb://')) {
+  let url = remotePath;
+  let logUrl = remotePath;
+  if (username && password && remotePath.startsWith('smb://')) {
     const domainPrefix = adDomain ? `${encodeURIComponent(adDomain)};` : '';
-    macRemote = macRemote.replace(
+    url = remotePath.replace(
       'smb://',
       `smb://${domainPrefix}${encodeURIComponent(username)}:${encodeURIComponent(password)}@`,
     );
-    macRemoteLog = macRemoteLog.replace(
+    logUrl = remotePath.replace(
       'smb://',
       `smb://${domainPrefix}${encodeURIComponent(username)}:***@`,
     );
   }
+  return { url, logUrl };
+};
+
+export const mountMac = (options: MountOptions) => {
+  const { remotePath, localPath, mountPath, credentials, debug = false } = options;
+  const { url: macRemote, logUrl: macRemoteLog } = buildMacSmbUrl(remotePath, credentials);
   if (debug) signale.debug(`Executing: mount_smbfs "${macRemoteLog}" "${mountPath}"`);
   execFileSync('mount_smbfs', [macRemote, mountPath], {
     stdio: debug ? 'pipe' : 'ignore',
@@ -276,15 +289,10 @@ export const mountMac = (options: MountOptions) => {
 
 export const mountLinux = (options: MountOptions) => {
   const { remotePath, localPath, mountPath, credentials, debug = false } = options;
-  const { username, password, adDomain } = credentials || {};
-  let linuxRemote = remotePath;
-  if (linuxRemote.startsWith('smb://')) {
-    linuxRemote = linuxRemote.replace('smb://', '//');
-  }
-  const mountOpts =
-    username && password ? `username=${username},password=${password},domain=${adDomain}` : 'guest';
-  const mountOptsLog =
-    username && password ? `username=${username},password=***,domain=${adDomain}` : 'guest';
+  const { url: linuxRemote, opts: mountOpts, logOpts: mountOptsLog } = buildLinuxCifsMount(
+    remotePath,
+    credentials,
+  );
   if (debug)
     signale.debug(
       `Executing: sudo mount -t cifs -o ${mountOptsLog} "${linuxRemote}" "${mountPath}"`,
@@ -294,6 +302,159 @@ export const mountLinux = (options: MountOptions) => {
   });
   if (!fs.existsSync(localPath)) {
     fs.symlinkSync(mountPath, localPath);
+  }
+};
+
+/**
+ * Build the host path and CIFS `-o` option string for a Linux `mount -t cifs`
+ * call. Returns the option string plus a redacted version for logging.
+ */
+export const buildLinuxCifsMount = (
+  remotePath: string,
+  credentials?: Credentials,
+): { url: string; opts: string; logOpts: string } => {
+  const { username, password, adDomain } = credentials || {};
+  const url = remotePath.startsWith('smb://') ? remotePath.replace('smb://', '//') : remotePath;
+  const opts =
+    username && password ? `username=${username},password=${password},domain=${adDomain}` : 'guest';
+  const logOpts =
+    username && password ? `username=${username},password=***,domain=${adDomain}` : 'guest';
+  return { url, opts, logOpts };
+};
+
+
+/**
+ * Search the system mount table for an existing SMB/CIFS mount of the given
+ * server + share, ignoring any `user@`/`domain;user@` prefix in the source.
+ * Returns the local mount point if found (e.g. a prior run or a Finder mount
+ * under /Volumes), so the caller can alias into it without re-authenticating.
+ */
+export const findExistingSmbMount = (
+  server: string,
+  share: string,
+  debug = false,
+): string | undefined => {
+  try {
+    const out = execSync('mount', { encoding: 'utf8' });
+    const target = `${server.toLowerCase()}/${share.toLowerCase()}`;
+    for (const line of out.split('\n')) {
+      const onIdx = line.indexOf(' on ');
+      if (onIdx === -1) continue;
+      const source = line.slice(0, onIdx);
+      const rest = line.slice(onIdx + 4);
+      const parenIdx = rest.indexOf(' (');
+      const typeIdx = rest.indexOf(' type ');
+      const candidates = [parenIdx, typeIdx].filter((idx) => idx !== -1);
+      const cutIdx = candidates.length ? Math.min(...candidates) : -1;
+      const mountPoint = cutIdx === -1 ? rest : rest.slice(0, cutIdx);
+      const normalizedSource = source
+        .toLowerCase()
+        .replace(/^\/\/[^/]*@/, '//')
+        .replace(/^\/\//, '');
+      if (normalizedSource === target || normalizedSource.startsWith(`${target}/`)) {
+        if (debug) signale.debug(`Reusing existing mount of ${target} at ${mountPoint}`);
+        return mountPoint;
+      }
+    }
+  } catch (e) {
+    if (debug) signale.debug('Could not inspect existing mounts:', (e as Error).message);
+  }
+  return undefined;
+};
+
+export interface NixShareMountOptions {
+  remotePath: string;
+  mountPath: string;
+  credentials?: Credentials;
+  debug?: boolean;
+  osInfo: OsInfo;
+}
+
+/**
+ * Mount an SMB/CIFS share root once. On macOS it first attempts a
+ * credential-free mount so an existing authenticated server session or a saved
+ * keychain Internet password is reused without prompting, falling back to an
+ * embedded-credential URL only if that fails.
+ */
+export const mountNixShare = (options: NixShareMountOptions): void => {
+  const { remotePath, mountPath, credentials, debug = false, osInfo } = options;
+  if (!fs.existsSync(mountPath)) {
+    fs.mkdirSync(mountPath, { recursive: true });
+  }
+
+  if (osInfo.isMac) {
+    const { url: plainUrl } = buildMacSmbUrl(remotePath);
+    try {
+      if (debug)
+        signale.debug(`Executing: mount_smbfs "${plainUrl}" "${mountPath}" (reuse session/keychain)`);
+      execFileSync('mount_smbfs', [plainUrl, mountPath], { stdio: debug ? 'pipe' : 'ignore' });
+      return;
+    } catch (e) {
+      if (debug)
+        signale.debug(
+          `Credential-free mount failed, retrying with credentials: ${(e as Error).message}`,
+        );
+    }
+    const { url, logUrl } = buildMacSmbUrl(remotePath, credentials);
+    if (debug) signale.debug(`Executing: mount_smbfs "${logUrl}" "${mountPath}"`);
+    execFileSync('mount_smbfs', [url, mountPath], { stdio: debug ? 'pipe' : 'ignore' });
+    return;
+  }
+
+  const { url: linuxRemote, opts, logOpts } = buildLinuxCifsMount(remotePath, credentials);
+  if (debug)
+    signale.debug(`Executing: sudo mount -t cifs -o ${logOpts} "${linuxRemote}" "${mountPath}"`);
+  execFileSync('sudo', ['mount', '-t', 'cifs', '-o', opts, linuxRemote, mountPath], {
+    stdio: debug ? 'pipe' : 'ignore',
+  });
+};
+
+export interface SubfolderAliasOptions {
+  folderMapping: FolderMapping;
+  baseDir: string;
+  baseMountPath: string;
+  truncateLength: number;
+  debug?: boolean;
+}
+
+/**
+ * Create a symlink alias in baseDir pointing at a subfolder of the single
+ * mounted share. Skips (without error) when the subfolder is not accessible, and
+ * never clobbers a real (non-symlink) file/directory already at the alias path.
+ */
+export const aliasSubfolder = (options: SubfolderAliasOptions): boolean => {
+  const { folderMapping, baseDir, baseMountPath, truncateLength, debug = false } = options;
+  const folderName = getFolderName(folderMapping, truncateLength);
+  const localPath = path.join(baseDir, folderName);
+  const subfolderPath = path.join(baseMountPath, folderMapping.id);
+
+  signale.info(`Mapping ${subfolderPath} to ${localPath}`);
+
+  try {
+    fs.accessSync(subfolderPath, fs.constants.R_OK);
+  } catch {
+    signale.warn(`Subfolder not accessible: ${subfolderPath}. Skipping.`);
+    return false;
+  }
+
+  try {
+    if (fs.existsSync(localPath)) {
+      const stat = fs.lstatSync(localPath);
+      if (stat.isSymbolicLink()) {
+        fs.unlinkSync(localPath);
+      } else {
+        signale.warn(`Skipping alias for ${localPath}: a non-symlink already exists.`);
+        return false;
+      }
+    }
+    fs.symlinkSync(subfolderPath, localPath);
+    if (debug) signale.debug(`Aliased ${subfolderPath} -> ${localPath}`);
+    return true;
+  } catch (error: unknown) {
+    process.exitCode = 1;
+    signale.error(`Error: Failed to alias ${subfolderPath} to ${localPath}`);
+    signale.error(`Reason: ${error instanceof Error ? error.message : String(error)}`);
+    return false;
   }
 };
 

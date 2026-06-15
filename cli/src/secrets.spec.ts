@@ -218,3 +218,36 @@ describe('Windows credential storage – PasswordVault', () => {
     expect(scripts.some((s) => s.includes("FindAllByResource('rdss-folder-mapper-token')"))).toBe(true);
   });
 });
+
+describe('saveMacInternetPassword', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('saves an SMB internet-password entry with the smb protocol code', () => {
+    vi.mocked(childProcess.execFileSync).mockReturnValue(Buffer.from(''));
+
+    secrets.saveMacInternetPassword('rstore.qut.edu.au', 'user@qut.edu.au', 's3cr3t', false);
+
+    const call = vi.mocked(childProcess.execFileSync).mock.calls[0];
+    expect(call[0]).toBe('security');
+    const args = call[1] as string[];
+    expect(args).toContain('add-internet-password');
+    expect(args).toContain('-r');
+    expect(args).toContain('smb ');
+    expect(args[args.indexOf('-s') + 1]).toBe('rstore.qut.edu.au');
+    expect(args[args.indexOf('-a') + 1]).toBe('user@qut.edu.au');
+    expect(args[args.indexOf('-w') + 1]).toBe('s3cr3t');
+    expect(args).toContain('-U');
+  });
+
+  it('never throws when the security command fails', () => {
+    vi.mocked(childProcess.execFileSync).mockImplementation(() => {
+      throw new Error('keychain locked');
+    });
+
+    expect(() =>
+      secrets.saveMacInternetPassword('rstore.qut.edu.au', 'user', 'pw', false),
+    ).not.toThrow();
+  });
+});

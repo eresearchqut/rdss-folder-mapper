@@ -137,6 +137,43 @@ export const saveMacCredentials = (
   }
 };
 
+/**
+ * Save an SMB Internet password to the macOS login keychain so that the OS
+ * (NetFS / Finder / mount_smbfs) can re-authenticate to the server natively
+ * without prompting on subsequent connections. Best-effort: failures are logged
+ * in debug mode but never thrown.
+ */
+export const saveMacInternetPassword = (
+  server: string,
+  account: string,
+  password: string,
+  debug: boolean,
+): void => {
+  try {
+    if (debug) signale.debug(`Saving SMB Internet password for ${server} to macOS keychain...`);
+    // -r "smb " is the four-character SMB protocol code (trailing space pads to 4).
+    const args = [
+      'add-internet-password',
+      '-a',
+      account,
+      '-s',
+      server,
+      '-r',
+      'smb ',
+      '-D',
+      'Network Password',
+      '-w',
+      password,
+      '-U',
+    ];
+    execFileSync('security', args, { stdio: debug ? 'pipe' : 'ignore' });
+  } catch (e) {
+    let msg = (e as Error).message;
+    msg = msg.split(password).join('***');
+    if (debug) signale.debug('Failed to save Internet password to macOS keychain:', msg);
+  }
+};
+
 export const saveLinuxCredentials = (
   creds: Credentials,
   debug: boolean,

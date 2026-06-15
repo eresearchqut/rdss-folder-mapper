@@ -12,6 +12,11 @@ import {
   removeMapping,
   mountMac,
   mountLinux,
+  buildMacSmbUrl,
+  buildLinuxCifsMount,
+  findExistingSmbMount,
+  mountNixShare,
+  aliasSubfolder,
   resetMountsDir,
   isWindowsShareAccessible,
 } from './mount';
@@ -393,6 +398,205 @@ describe('mount.ts unit tests', () => {
       expect.stringContaining('umount'),
       expect.anything(),
       );
+    });
+  });
+
+  const macOs = () => ({ ...getOs(), isMac: true, isWindows: false, isLinux: false });
+  const linuxOs = () => ({ ...getOs(), isMac: false, isWindows: false, isLinux: true });
+
+  describe('buildMacSmbUrl', () => {
+    it('returns the path unchanged when no credentials are supplied', () => {
+      const { url, logUrl } = buildMacSmbUrl('smb://host/projects');
+      expect(url).toBe('smb://host/projects');
+      expect(logUrl).toBe('smb://host/projects');
+    });
+
+    it('injects URL-encoded credentials and redacts the log URL', () => {
+      const { url, logUrl } = buildMacSmbUrl('smb://host/projects', {
+        username: 'user@qut.edu.au',
+        password: 'p@ss:word',
+        adDomain: 'qutad',
+      });
+      expect(url).toBe('smb://qutad;user%40qut.edu.au:p%40ss%3Aword@host/projects');
+      expect(logUrl).toBe('smb://qutad;user%40qut.edu.au:***@host/projects');
+      expect(logUrl).not.toContain('p@ss');
+    });
+  });
+
+  describe('buildLinuxCifsMount', () => {
+    it('converts smb:// to // and uses guest options without credentials', () => {
+      const { url, opts, logOpts } = buildLinuxCifsMount('smb://host/projects');
+      expect(url).toBe('//host/projects');
+      expect(opts).toBe('guest');
+      expect(logOpts).toBe('guest');
+    });
+
+    it('builds credentialed options and redacts the password in logOpts', () => {
+      const { url, opts, logOpts } = buildLinuxCifsMount('smb://host/projects', {
+        username: 'user',
+        password: 's3cr3t',
+        adDomain: 'qutad',
+      });
+      expect(url).toBe('//host/projects');
+      expect(opts).toBe('username=user,password=s3cr3t,domain=qutad');
+      expect(logOpts).toBe('username=user,password=***,domain=qutad');
+    });
+  });
+
+  describe('findExistingSmbMount', () => {
+    it('matches a macOS smbfs mount ignoring the user@ prefix', () => {
+      vi.mocked(child_process.execSync).mockReturnValue(
+        '//qutad;user@rstore.qut.edu.au/projects on /Volumes/projects (smbfs, nodev, nosuid)\n' as any,
+      );
+      expect(findExistingSmbMount('rstore.qut.edu.au', 'projects')).toBe('/Volumes/projects');
+    });
+
+    it('matches a Linux cifs mount using the " type " separator', () => {
+      vi.mocked(child_process.execSync).mockReturnValue(
+        '//rstore.qut.edu.au/projects on /home/u/RDSS/.mounts/projects type cifs (rw,relatime)\n' as any,
+      );
+      expect(findExistingSmbMount('rstore.qut.edu.au', 'projects')).toBe(
+        '/home/u/RDSS/.mounts/projects',
+      );
+    });
+
+    it('returns undefined when no matching mount exists', () => {
+      vi.mocked(child_process.execSync).mockReturnValue(
+        '/dev/disk1s1 on / (apfs, local)\n' as any,
+      );
+      expect(findExistingSmbMount('rstore.qut.edu.au', 'projects')).toBeUndefined();
+    });
+  });
+
+  describe('mountNixShare', () => {
+    it('macOS: tries a credential-free mount first and does not retry on success', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(child_process.execFileSync).mockReturnValue(undefined as any);
+
+      mountNixShare({
+        remotePath: 'smb://host/projects',
+        mountPath: '/base/.mounts/projects',
+        credentials: { username: 'user', password: 'pw' },
+        osInfo: macOs(),
+      });
+
+      const calls = vi.mocked(child_process.execFileSync).mock.calls;
+      expect(calls).toHaveLength(1);
+      // First (and only) attempt must NOT contain embedded credentials.
+      expect(calls[0][1]).toEqual(['smb://host/projects', '/base/.mounts/projects']);
+    });
+
+    it('macOS: falls back to credentialed mount when the credential-free attempt fails', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(child_process.execFileSync)
+        .mockImplementationOnce(() => {
+          throw new Error('NT_STATUS_LOGON_FAILURE');
+        })
+        .mockReturnValueOnce(undefined as any);
+
+      mountNixShare({
+        remotePath: 'smb://host/projects',
+        mountPath: '/base/.mounts/projects',
+        credentials: { username: 'user', password: 'pw' },
+        osInfo: macOs(),
+      });
+
+      const calls = vi.mocked(child_process.execFileSync).mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls[0][1]).toEqual(['smb://host/projects', '/base/.mounts/projects']);
+      expect((calls[1][1] as string[])[0]).toBe('smb://user:pw@host/projects');
+    });
+
+    it('Linux: mounts via sudo mount -t cifs with an argument array', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(child_process.execFileSync).mockReturnValue(undefined as any);
+
+      mountNixShare({
+        remotePath: 'smb://host/projects',
+        mountPath: '/base/.mounts/projects',
+        credentials: { username: 'user', password: 'pw', adDomain: 'qutad' },
+        osInfo: linuxOs(),
+      });
+
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+        'sudo',
+        ['mount', '-t', 'cifs', '-o', 'username=user,password=pw,domain=qutad', '//host/projects', '/base/.mounts/projects'],
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe('aliasSubfolder', () => {
+    it('symlinks an accessible subfolder into baseDir', () => {
+      vi.mocked(fs.accessSync).mockReturnValue(undefined as any);
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const symlink = vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+
+      const result = aliasSubfolder({
+        folderMapping: { id: 'abc123', nickname: 'My Project' } as any,
+        baseDir: '/base',
+        baseMountPath: '/base/.mounts/projects',
+        truncateLength: 40,
+      });
+
+      expect(result).toBe(true);
+      expect(symlink).toHaveBeenCalledWith(
+        '/base/.mounts/projects/abc123',
+        '/base/My Project [abc123]',
+      );
+    });
+
+    it('skips (returns false) when the subfolder is not accessible', () => {
+      vi.mocked(fs.accessSync).mockImplementation(() => {
+        throw new Error('EACCES');
+      });
+      const symlink = vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+
+      const result = aliasSubfolder({
+        folderMapping: { id: 'abc123' } as any,
+        baseDir: '/base',
+        baseMountPath: '/base/.mounts/projects',
+        truncateLength: 40,
+      });
+
+      expect(result).toBe(false);
+      expect(symlink).not.toHaveBeenCalled();
+    });
+
+    it('does not clobber a real (non-symlink) directory already at the alias path', () => {
+      vi.mocked(fs.accessSync).mockReturnValue(undefined as any);
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({ isSymbolicLink: () => false } as fs.Stats);
+      const symlink = vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+
+      const result = aliasSubfolder({
+        folderMapping: { id: 'abc123', nickname: 'My Project' } as any,
+        baseDir: '/base',
+        baseMountPath: '/base/.mounts/projects',
+        truncateLength: 40,
+      });
+
+      expect(result).toBe(false);
+      expect(symlink).not.toHaveBeenCalled();
+    });
+
+    it('replaces a stale symlink already at the alias path', () => {
+      vi.mocked(fs.accessSync).mockReturnValue(undefined as any);
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.lstatSync).mockReturnValue({ isSymbolicLink: () => true } as fs.Stats);
+      const unlink = vi.mocked(fs.unlinkSync).mockReturnValue(undefined as any);
+      const symlink = vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
+
+      const result = aliasSubfolder({
+        folderMapping: { id: 'abc123', nickname: 'My Project' } as any,
+        baseDir: '/base',
+        baseMountPath: '/base/.mounts/projects',
+        truncateLength: 40,
+      });
+
+      expect(result).toBe(true);
+      expect(unlink).toHaveBeenCalledWith('/base/My Project [abc123]');
+      expect(symlink).toHaveBeenCalled();
     });
   });
 });
