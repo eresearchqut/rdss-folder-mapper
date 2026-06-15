@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('api', {
   getConfigSources: (): Promise<{ label: string; path: string; loaded: boolean }[]> =>
     ipcRenderer.invoke('get-config-sources'),
 
+  openConfigFile: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke('open-config-file', filePath),
+
   saveConfig: (config: Config): Promise<void> => ipcRenderer.invoke('save-config', config),
 
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
