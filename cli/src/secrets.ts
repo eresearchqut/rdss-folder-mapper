@@ -5,18 +5,18 @@ import { OsInfo } from './os';
 export interface Credentials {
   username?: string;
   password?: string;
-  adDomain?: string;
+  domain?: string;
 }
 
 const splitDomainFromUsername = (
   username: string,
-  adDomain?: string,
-): { username: string; adDomain?: string } => {
-  if (!adDomain && username.includes('\\')) {
+  domain?: string,
+): { username: string; domain?: string } => {
+  if (!domain && username.includes('\\')) {
     const [domainPart, ...rest] = username.split('\\');
-    return { username: rest.join('\\'), adDomain: domainPart };
+    return { username: rest.join('\\'), domain: domainPart };
   }
-  return { username, adDomain };
+  return { username, domain };
 };
 
 // ─── Linux: secret-tool (full SMB credentials) ───────────────────────────────
@@ -39,8 +39,8 @@ export const getLinuxCredentials = (debug: boolean): Credentials => {
     if (accountMatch && password) {
       if (debug) signale.debug('Credentials successfully retrieved from Linux secret-tool.');
       const domainHint = domainMatch ? domainMatch[1].trim() : undefined;
-      const { username, adDomain } = splitDomainFromUsername(accountMatch[1].trim(), domainHint);
-      return { username, password, adDomain };
+      const { username, domain } = splitDomainFromUsername(accountMatch[1].trim(), domainHint);
+      return { username, password, domain };
     }
   } catch (e) {
     if (debug) signale.debug('Failed to read from Linux secret-tool:', (e as Error).message);
@@ -53,7 +53,7 @@ export const saveLinuxCredentials = (creds: Credentials, debug: boolean): void =
     if (debug) signale.debug('Saving credentials to Linux secret-tool...');
     const args = ['store', '--label=RDSS Folder Mapper', 'service', 'rdss-folder-mapper'];
     if (creds.username) args.push('username', creds.username);
-    if (creds.adDomain) args.push('domain', creds.adDomain);
+    if (creds.domain) args.push('domain', creds.domain);
     execFileSync('secret-tool', args, {
       input: creds.password,
       stdio: ['pipe', debug ? 'pipe' : 'ignore', debug ? 'pipe' : 'ignore'],

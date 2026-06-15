@@ -85,8 +85,8 @@ Options:
   -v, --version              Output the current version number
   -b, --base-dir <path>      Custom base folder location (default: ~/Desktop/RDSS Folders)
   -f, --folders <path>       Custom folders JSON file location (default: folders.json)
-  -r, --remote-path <path>   Custom remote path
-  --remote-prefix <path>     Subpath/share within the remote path to mount (nix only)
+  -r, --host <host>          Custom remote host
+  --volume <volume>          Share/volume within the host to mount (nix only)
   -t, --truncate <number>    Truncate length for folder names (default: 40)
   --refresh                  Force login and fetch plans from DMP even if folders.json exists
   --dmp-base-url <url>       Base URL for DMP to fetch config
@@ -144,8 +144,8 @@ Place a `config.json` next to the executable to set default options:
   "debug": true,
   "baseDir": "~/MyRDSS",
   "truncateLength": 30,
-  "remotePath": "rstore.example.edu",
-  "remotePrefix": "Projects"
+  "host": "rstore.example.edu",
+  "volume": "Projects"
 }
 ```
 
@@ -153,12 +153,12 @@ _For security reasons, `username`, `password`, and `domain` cannot be set in `co
 
 ### Remote paths and the mount model
 
-The remote server is configured with `remotePath` (a bare host, e.g.
-`rstore.example.edu`) plus a `remotePrefix` (the share/subpath, e.g. `Projects`).
-The CLI formats `remotePath` per platform automatically — `smb://host` on
+The remote server is configured with `host` (a bare host, e.g.
+`rstore.example.edu`) plus a `volume` (the share/subpath, e.g. `Projects`).
+The CLI formats `host` per platform automatically — `smb://host` on
 macOS/Linux and `\\host` on Windows — so a single value works everywhere. (You
-can still override per platform with `remotePathNix` / `remotePathWin` and
-`remotePrefixNix` / `remotePrefixWin`, or with `--remote-path` / `--remote-prefix`.)
+can still override per platform with `hostNix` / `hostWin` and
+`volumeNix` / `volumeWin`, or with `--host` / `--volume`.)
 
 - **macOS / Linux**: the share `host/prefix` is mounted **once** at
   `<baseDir>/.mounts/<prefix>`, and each folder `id` is aliased from
