@@ -153,7 +153,7 @@ const saveConfig = (config: Config): void => {
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 520,
-    height: 560,
+    height: 620,
     resizable: false,
     title: 'RDSS Folder Mapper',
     webPreferences: {
