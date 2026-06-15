@@ -311,6 +311,15 @@ ipcMain.handle('get-config', () => loadConfig());
 
 ipcMain.handle('get-config-sources', () => getConfigSources());
 
+ipcMain.handle('open-config-file', async (_event, filePath: string) => {
+  // Only allow opening a path that is a known, currently-loaded config source,
+  // never an arbitrary path supplied by the renderer.
+  const source = getConfigSources().find(s => s.path === filePath && s.loaded);
+  if (!source) return false;
+  const error = await shell.openPath(source.path);
+  return error === '';
+});
+
 ipcMain.handle('save-config', (_event, config: Config) => {
   saveConfig(config);
 });

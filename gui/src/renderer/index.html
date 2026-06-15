@@ -281,6 +281,8 @@
       font-size: 11px; color: var(--qut-text); word-break: break-all;
     }
     .config-source.missing .cs-path { color: #9aa5b2; }
+    a.cs-path { cursor: pointer; color: var(--qut-blue); text-decoration: none; }
+    a.cs-path:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -368,7 +370,7 @@
     <div class="field hidden" id="configSourcesRow">
       <label>Configuration sources</label>
       <div class="config-sources" id="configSources"></div>
-      <div class="hint">Config files the app reads, in priority order (later overrides earlier).</div>
+      <div class="hint">Config files the app reads, in priority order (later overrides earlier). Click a loaded path to open it.</div>
     </div>
 
     <div class="settings-actions">
@@ -610,9 +612,13 @@
           const label = document.createElement('div');
           label.className = 'cs-label';
           label.textContent = src.label + (src.loaded ? '' : ' (not found)');
-          const pathEl = document.createElement('div');
+          const pathEl = document.createElement(src.loaded ? 'a' : 'div');
           pathEl.className = 'cs-path';
           pathEl.textContent = src.path;
+          if (src.loaded) {
+            pathEl.title = 'Open this config file';
+            pathEl.addEventListener('click', () => window.api.openConfigFile(src.path));
+          }
           body.appendChild(label);
           body.appendChild(pathEl);
           row.appendChild(status);
