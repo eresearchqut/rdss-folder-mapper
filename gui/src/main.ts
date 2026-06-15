@@ -76,6 +76,16 @@ const parseDeploymentJson = (raw: string): DeploymentConfig => {
 };
 
 /**
+ * Local deployment config.json candidates (developer / per-machine override),
+ * checked in priority order. Shared by loadDeploymentConfig and getConfigSources
+ * so both stay in sync.
+ */
+const localDeploymentConfigCandidates = (): string[] => [
+  path.join(app.getAppPath(), '..', 'config.json'),
+  path.join(process.cwd(), 'config.json'),
+];
+
+/**
  * Loads the deployment config, merging sources from lowest to highest priority:
  *   1. System config file  (IT-provisioned via SCCM / Jamf / script)
  *   2. Local config.json   (next to binary — developer / per-machine override)
@@ -91,11 +101,7 @@ const loadDeploymentConfig = (): DeploymentConfig => {
   } catch { /* ignore missing or malformed system config */ }
 
   // Override layer: local config.json next to the binary (dev / machine-specific)
-  const localCandidates = [
-    path.join(app.getAppPath(), '..', 'config.json'),
-    path.join(process.cwd(), 'config.json'),
-  ];
-  for (const candidate of localCandidates) {
+  for (const candidate of localDeploymentConfigCandidates()) {
     if (fs.existsSync(candidate)) {
       try {
         result = { ...result, ...parseDeploymentJson(fs.readFileSync(candidate, 'utf8')) };
@@ -105,6 +111,37 @@ const loadDeploymentConfig = (): DeploymentConfig => {
   }
 
   return result;
+};
+
+interface ConfigSource {
+  label: string;
+  path: string;
+  loaded: boolean;
+}
+
+/**
+ * Describes the config files the app reads and whether each was found, for
+ * display on the settings page when debug is enabled. Useful for diagnosing
+ * which config.json an installation actually picked up.
+ */
+const getConfigSources = (): ConfigSource[] => {
+  const sources: ConfigSource[] = [];
+
+  const userPath = configPath();
+  sources.push({ label: 'User settings', path: userPath, loaded: fs.existsSync(userPath) });
+
+  const sysPath = systemDeploymentConfigPath();
+  sources.push({ label: 'System deployment config', path: sysPath, loaded: fs.existsSync(sysPath) });
+
+  const localCandidates = localDeploymentConfigCandidates();
+  const localLoaded = localCandidates.find(candidate => fs.existsSync(candidate));
+  sources.push({
+    label: 'Local override',
+    path: localLoaded ?? localCandidates[0],
+    loaded: Boolean(localLoaded),
+  });
+
+  return sources;
 };
 
 const saveConfig = (config: Config): void => {
@@ -256,6 +293,8 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
 // ─── IPC handlers ────────────────────────────────────────────────────────────
 
 ipcMain.handle('get-config', () => loadConfig());
+
+ipcMain.handle('get-config-sources', () => getConfigSources());
 
 ipcMain.handle('save-config', (_event, config: Config) => {
   saveConfig(config);

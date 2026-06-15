@@ -8,6 +8,9 @@ interface Config {
 contextBridge.exposeInMainWorld('api', {
   getConfig: (): Promise<Config> => ipcRenderer.invoke('get-config'),
 
+  getConfigSources: (): Promise<{ label: string; path: string; loaded: boolean }[]> =>
+    ipcRenderer.invoke('get-config-sources'),
+
   saveConfig: (config: Config): Promise<void> => ipcRenderer.invoke('save-config', config),
 
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
