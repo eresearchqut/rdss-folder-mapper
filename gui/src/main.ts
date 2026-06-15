@@ -67,9 +67,11 @@ const systemDeploymentConfigPath = (): string => {
 
 const parseDeploymentJson = (raw: string): DeploymentConfig => {
   const parsed = JSON.parse(raw);
+  // Only user credentials are forbidden in config; the AD `domain` (e.g. "qutad")
+  // is a legitimate, non-secret deployment setting and must be preserved so the
+  // credentials dialog can skip prompting for it.
   delete parsed.username;
   delete parsed.password;
-  delete parsed.domain;
   return parsed as DeploymentConfig;
 };
 
