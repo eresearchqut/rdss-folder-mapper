@@ -26,6 +26,7 @@ interface WorkerConfig {
   baseDir: string;
   foldersFile?: string;
   remotePath?: string;
+  remotePrefix?: string;
   apiUrl?: string;
   clientId?: string;
   authDomain?: string;
@@ -56,6 +57,7 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
         baseDir: config.baseDir,
         foldersFile: config.foldersFile,
         remotePath: config.remotePath,
+        remotePrefix: config.remotePrefix,
         apiUrl: config.apiUrl,
         clientId: config.clientId,
         authDomain: config.authDomain,

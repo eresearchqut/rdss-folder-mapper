@@ -86,6 +86,7 @@ Options:
   -b, --base-dir <path>      Custom base folder location (default: ~/Desktop/RDSS Folders)
   -f, --folders <path>       Custom folders JSON file location (default: folders.json)
   -r, --remote-path <path>   Custom remote path
+  --remote-prefix <path>     Subpath/share within the remote path to mount (nix only)
   -t, --truncate <number>    Truncate length for folder names (default: 40)
   --refresh                  Force login and fetch plans from DMP even if folders.json exists
   --dmp-base-url <url>       Base URL for DMP to fetch config
@@ -131,11 +132,29 @@ Place a `config.json` next to the executable to set default options:
 {
   "debug": true,
   "baseDir": "~/MyRDSS",
-  "truncateLength": 30
+  "truncateLength": 30,
+  "remotePathNix": "smb://rstore.example.edu",
+  "remotePrefixNix": "projects",
+  "remotePathWin": "\\\\rstore.example.edu"
 }
 ```
 
 _For security reasons, `username`, `password`, and `domain` cannot be set in `config.json`. Use `auth` instead._
+
+### Remote paths and the nix mount model
+
+The remote server is configured per platform via `remotePathNix` / `remotePathWin`
+(or `--remote-path`). On macOS and Linux the CLI connects to the share **once**
+and then creates symlink aliases to each project subfolder, instead of mounting
+every folder separately. This avoids repeated authentication prompts.
+
+- `remotePathNix` is the server/share root, e.g. `smb://rstore.example.edu`.
+- `remotePrefixNix` (or `--remote-prefix`) is the share/subpath to mount once,
+  e.g. `projects`. The share is mounted at `<baseDir>/.mounts/<prefix>` and each
+  folder `id` is aliased from `<baseDir>/<Name [id]>` to `.mounts/<prefix>/<id>`.
+- On macOS the share credential is also saved as a keychain Internet password so
+  Finder and subsequent connections re-authenticate without prompting.
+- Windows is unchanged: each folder is still mapped individually.
 
 ## Remote Configuration & OAuth Login
 

@@ -18,12 +18,24 @@ import {
   getCredentialsFromKeychain,
   saveCredentialsToKeychain,
   clearCredentialsFromKeychain,
+  saveMacInternetPassword,
   Credentials,
 } from './secrets';
 import { getOs, OsInfo } from './os';
 import { setupFetchMiddleware, performLogin } from './auth';
 import { loadFoldersConfig } from './config';
-import { processFolderMapping, setupBaseDirectory, reset, sanitizeErrorMessage, isWindowsShareAccessible } from './mount';
+import {
+  processFolderMapping,
+  setupBaseDirectory,
+  reset,
+  sanitizeErrorMessage,
+  isWindowsShareAccessible,
+  isMounted,
+  findExistingSmbMount,
+  mountNixShare,
+  aliasSubfolder,
+  handleMountError,
+} from './mount';
 
 // Export for tests and GUI
 export { transformPlansToFolders, performLogin };
@@ -52,6 +64,7 @@ interface RefreshOptions {
   baseDir?: string;
   foldersFile?: string;
   remotePath?: string;
+  remotePrefix?: string;
   adDomain?: string;
   truncateLength?: number;
   refresh?: boolean;
@@ -117,6 +130,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     baseDir = BASE_DIR,
     foldersFile = 'folders.json',
     remotePath,
+    remotePrefix,
     truncateLength = 40,
     refresh: doRefresh = false,
     apiUrl,
@@ -230,23 +244,76 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     credentials = await resolveCredentials(options, osInfo, baseRemotePath);
 
     options.onEvent?.({ type: 'mount:start', total: folders.length });
-    for (let i = 0; i < folders.length; i++) {
-      const folder = folders[i];
-      const folderRemotePath = `${baseRemotePath}${osInfo.isWindows ? '\\' : '/'}${folder.id}`;
 
-      processFolderMapping({
-        folderMapping: folder,
-        baseDir,
-        mountsDir,
-        remotePath: folderRemotePath,
-        truncateLength,
-        credentials,
-        debug,
-        osInfo,
-      });
+    if (osInfo.isWindows) {
+      for (let i = 0; i < folders.length; i++) {
+        const folder = folders[i];
+        const folderRemotePath = `${baseRemotePath}\\${folder.id}`;
 
-      if (options.onProgress) {
-        options.onProgress(i + 1, folders.length, folder.title || folder.id);
+        processFolderMapping({
+          folderMapping: folder,
+          baseDir,
+          mountsDir,
+          remotePath: folderRemotePath,
+          truncateLength,
+          credentials,
+          debug,
+          osInfo,
+        });
+
+        if (options.onProgress) {
+          options.onProgress(i + 1, folders.length, folder.title || folder.id);
+        }
+      }
+    } else {
+      // nix: connect to the share root once, then alias each subfolder into it.
+      const prefix = remotePrefix || process.env.REMOTE_PREFIX_NIX;
+      const sharePath = prefix ? `${baseRemotePath}/${prefix}` : baseRemotePath;
+      const server = baseRemotePath.replace(/^smb:\/\//, '').replace(/\/.*$/, '');
+      const share = prefix || sharePath.replace(/^smb:\/\//, '').replace(/^[^/]*\/?/, '');
+      const mountDirName = (prefix || share || 'share').replace(/[\\/]+/g, '_') || 'share';
+
+      // Reuse an existing mount (prior run or Finder /Volumes mount) to avoid re-auth.
+      let baseMountPath = findExistingSmbMount(server, share, debug);
+      if (baseMountPath) {
+        if (debug) signale.debug(`Reusing existing mount at ${baseMountPath}`);
+      } else {
+        baseMountPath = path.join(mountsDir, mountDirName);
+        if (!isMounted(baseMountPath, baseMountPath, osInfo)) {
+          signale.info(`Mounting share ${sharePath} to ${baseMountPath}`);
+          try {
+            mountNixShare({
+              remotePath: sharePath,
+              mountPath: baseMountPath,
+              credentials,
+              debug,
+              osInfo,
+            });
+          } catch (error: unknown) {
+            handleMountError(
+              error,
+              sharePath,
+              baseMountPath,
+              baseMountPath,
+              credentials?.password,
+              debug,
+              osInfo,
+            );
+            options.onEvent?.({ type: 'mount:complete' });
+            return;
+          }
+        }
+        if (osInfo.isMac && credentials?.username && credentials?.password) {
+          saveMacInternetPassword(server, credentials.username, credentials.password, debug);
+        }
+      }
+
+      for (let i = 0; i < folders.length; i++) {
+        const folder = folders[i];
+        aliasSubfolder({ folderMapping: folder, baseDir, baseMountPath, truncateLength, debug });
+        if (options.onProgress) {
+          options.onProgress(i + 1, folders.length, folder.title || folder.id);
+        }
       }
     }
     options.onEvent?.({ type: 'mount:complete' });
@@ -271,6 +338,7 @@ program
   .option('-b, --base-dir <path>', 'Custom base folder location (default: ~/Desktop/RDSS Folders)')
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
   .option('-r, --remote-path <path>', 'Custom remote path')
+  .option('--remote-prefix <path>', 'Subpath/share within the remote path to mount (nix only)')
   .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10))
   .option('--refresh', 'Force login and fetch plans from DMP even if folders.json exists')
   .option('--force', 'Ignore existing token in keychain and force a new login')
@@ -288,6 +356,9 @@ program
         if (!parsed.remotePath) {
           parsed.remotePath = osInfo.isWindows ? parsed.remotePathWin : parsed.remotePathNix;
         }
+        if (!parsed.remotePrefix) {
+          parsed.remotePrefix = osInfo.isWindows ? parsed.remotePrefixWin : parsed.remotePrefixNix;
+        }
         configOptions = parsed;
       } catch (e) {
         signale.error('Warning: Failed to parse config.json', (e as Error).message);
@@ -299,6 +370,7 @@ program
       baseDir: options.baseDir ?? configOptions.baseDir,
       foldersFile: options.folders ?? configOptions.foldersFile,
       remotePath: options.remotePath ?? configOptions.remotePath,
+      remotePrefix: options.remotePrefix ?? configOptions.remotePrefix,
       adDomain: configOptions.adDomain,
       truncateLength: options.truncate ?? configOptions.truncateLength,
       refresh: options.refresh,
