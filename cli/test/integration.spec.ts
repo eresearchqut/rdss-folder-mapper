@@ -86,6 +86,11 @@ describe('Mount Integration Test', () => {
   describe('CLI mounting', () => {
     const testRdssDir = path.join(process.cwd(), '.test', 'RDSS');
     const mockBinDir = path.join(process.cwd(), '.test', 'bin');
+    // The macOS Finder mount path creates a real /Volumes mount that a test can
+    // neither create nor predict, so the mock `osascript` populates this fake
+    // mount directory and the mock `mount` advertises it. `findExistingSmbMount`
+    // then resolves the share to it, exactly as it would a real Finder mount.
+    const mockMountDir = path.join(process.cwd(), '.test', 'mnt');
     // The new nix model mounts a single share (the prefix) once, then aliases
     // subfolders by id within it. `test_share` is the Samba share name.
     const volumeNix = 'test_share';
@@ -116,18 +121,36 @@ exit 0
       fs.writeFileSync(path.join(mockBinDir, 'security'), mockScript, { mode: 0o755 });
       fs.writeFileSync(path.join(mockBinDir, 'secret-tool'), mockScript, { mode: 0o755 });
 
-      // macOS now authenticates via the native SMB Internet password, which a
-      // mock `security` cannot write to the real keychain that the real
-      // mount_smbfs reads. Mock mount_smbfs so the mount/alias orchestration is
-      // exercised deterministically: it creates the mount point and the expected
-      // `proj_alpha` subfolder so subfolder aliasing succeeds. (Real Samba auth
-      // is still covered by the smbclient test below.)
-      const mockMountSmbfs = `#!/bin/bash
-mountpath="\${@: -1}"
-mkdir -p "$mountpath/proj_alpha"
+      // macOS now mounts SMB shares through Finder/NetFS, which a test cannot
+      // drive without a real GUI prompt. Mock `osascript` so the mount/alias
+      // orchestration is exercised deterministically: it creates a fake mount
+      // directory containing `proj_alpha` and records a corresponding entry in a
+      // fake mount table. Mock `mount` then reports that table so
+      // `findExistingSmbMount` resolves the share to the fake mount point. A URL
+      // containing "invalid" fails (exit 1) so the invalid-host test still errors.
+      // (Real Samba auth is still covered by the smbclient test below.)
+      fs.mkdirSync(mockMountDir, { recursive: true });
+      const mockOsascript = `#!/bin/bash
+url="$2"
+smb=$(echo "$url" | sed -n 's/.*"\\(smb:[^"]*\\)".*/\\1/p')
+if [[ "$smb" == *invalid* ]]; then
+  echo "mount volume failed" >&2
+  exit 1
+fi
+noproto=\${smb#smb://}
+share=\${noproto#*/}
+mnt="${mockMountDir}/\${share}"
+mkdir -p "$mnt/proj_alpha"
+echo "//\${noproto} on \${mnt} (smbfs, nodev, nosuid)" >> "${mockMountDir}/table"
 exit 0
 `;
-      fs.writeFileSync(path.join(mockBinDir, 'mount_smbfs'), mockMountSmbfs, { mode: 0o755 });
+      fs.writeFileSync(path.join(mockBinDir, 'osascript'), mockOsascript, { mode: 0o755 });
+
+      const mockMount = `#!/bin/bash
+cat "${mockMountDir}/table" 2>/dev/null
+exit 0
+`;
+      fs.writeFileSync(path.join(mockBinDir, 'mount'), mockMount, { mode: 0o755 });
     });
 
     beforeEach(() => {
@@ -135,6 +158,10 @@ exit 0
         fs.rmSync(testRdssDir, { recursive: true, force: true });
       }
       fs.mkdirSync(testRdssDir, { recursive: true });
+
+      // Start each test with an empty fake mount table so the reuse check in
+      // findExistingSmbMount doesn't see a stale entry from a prior test.
+      fs.rmSync(path.join(mockMountDir, 'table'), { force: true });
 
       fs.writeFileSync(
         'folders.json',
@@ -328,7 +355,12 @@ exit 0
       const customRemotePath = isWindows()
         ? '\\\\invalid-test-host'
         : 'smb://invalid-test-host:445';
-      const env = { ...process.env, RDSS_USERNAME: 'testuser', RDSS_PASSWORD: 'testpass' };
+      const env = {
+        ...process.env,
+        RDSS_USERNAME: 'testuser',
+        RDSS_PASSWORD: 'testpass',
+        PATH: `${mockBinDir}:${process.env.PATH}`,
+      };
 
       try {
         const output = execSync(

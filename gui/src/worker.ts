@@ -1,5 +1,5 @@
 import { parentPort } from 'worker_threads';
-import { refresh, reset, getOs, clearCredentialsFromKeychain, saveCredentialsToKeychain, formatRemoteBase } from 'rdss-folder-mapper';
+import { refresh, reset, getOs, clearCredentialsFromKeychain, saveCredentialsToKeychain, formatRemoteBase, getCachedToken, setCachedToken } from 'rdss-folder-mapper';
 import type { RefreshEvent, Credentials } from 'rdss-folder-mapper';
 
 const stripAnsi = (str: string) => str.replace(/\x1b\[[0-9;]*m/g, '');
@@ -34,6 +34,8 @@ interface WorkerConfig {
   domain?: string;
   username?: string;
   password?: string;
+  /** OAuth token cached by the main process, reused so each remap need not re-login. */
+  token?: string;
 }
 
 // Resolver set when the refresh flow is awaiting credentials from the main process.
@@ -52,6 +54,10 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
   process.exitCode = 0;
   try {
     if (type === 'refresh') {
+      // Seed the in-memory OAuth token from the main process so a fresh worker
+      // doesn't force a re-login on every remap, then return the (possibly
+      // renewed) token so the main process can keep caching it.
+      if (config.token) setCachedToken(config.token);
       await refresh({
         debug: config.debug,
         baseDir: config.baseDir,
@@ -76,6 +82,7 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
             send({ type: 'credentials-required' });
           }),
       });
+      send({ type: 'token', token: getCachedToken() });
     } else if (type === 'reset') {
       reset(config.debug, config.baseDir, getOs());
     } else if (type === 'clear-auth') {

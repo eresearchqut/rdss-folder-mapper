@@ -19,11 +19,10 @@ import {
   saveCredentialsToKeychain,
   clearCredentialsFromKeychain,
   saveMacInternetPassword,
-  getMacInternetPasswordAccount,
   Credentials,
 } from './secrets';
 import { getOs, OsInfo } from './os';
-import { setupFetchMiddleware, performLogin } from './auth';
+import { setupFetchMiddleware, performLogin, getCachedToken, setCachedToken } from './auth';
 import { loadFoldersConfig } from './config';
 import {
   processFolderMapping,
@@ -34,12 +33,13 @@ import {
   isMounted,
   findExistingSmbMount,
   mountNixShare,
+  mountMacViaFinder,
   aliasSubfolder,
   handleMountError,
 } from './mount';
 
 // Export for tests and GUI
-export { transformPlansToFolders, performLogin };
+export { transformPlansToFolders, performLogin, getCachedToken, setCachedToken };
 export type { AuthEvent } from './auth';
 export { reset } from './mount';
 export { getOs } from './os';
@@ -319,64 +319,52 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       let baseMountPath = findExistingSmbMount(server, share, debug);
       if (baseMountPath) {
         if (debug) signale.debug(`Reusing existing mount at ${baseMountPath}`);
+      } else if (osInfo.isMac) {
+        // macOS: delegate to Finder/NetFS. macOS handles authentication and
+        // keychain storage natively — the system prompt offers "remember in my
+        // keychain" and reuses it silently next time — so the app never manages
+        // SMB credentials on macOS.
+        signale.info(`Mounting share ${sharePath} via Finder`);
+        try {
+          mountMacViaFinder(sharePath, debug);
+        } catch (error: unknown) {
+          handleMountError(error, sharePath, '/Volumes', '/Volumes', undefined, debug, osInfo);
+          options.onEvent?.({ type: 'mount:complete' });
+          return;
+        }
+        baseMountPath = findExistingSmbMount(server, share, debug);
+        if (!baseMountPath) {
+          process.exitCode = 1;
+          signale.error(`Could not locate the mounted share for ${sharePath} after mounting.`);
+          options.onEvent?.({ type: 'mount:complete' });
+          return;
+        }
       } else {
+        // Linux: mount the share once with credentials from secret-tool (or a prompt).
         baseMountPath = path.join(mountsDir, mountDirName);
         if (!isMounted(baseMountPath, baseMountPath, osInfo)) {
           signale.info(`Mounting share ${sharePath} to ${baseMountPath}`);
-          let mounted = false;
-
-          // macOS: first try a credential-free mount using the username stored on
-          // the SMB Internet password (or the macOS login name). The OS supplies
-          // the saved password from the keychain, so there is no prompt.
-          if (osInfo.isMac) {
-            const probeUsername =
-              getMacInternetPasswordAccount(server, debug) || os.userInfo().username;
-            try {
-              mountNixShare({
-                remotePath: sharePath,
-                mountPath: baseMountPath,
-                probeUsername,
-                debug,
-                osInfo,
-              });
-              mounted = true;
-              if (debug) signale.debug('Mounted share using saved macOS credentials.');
-            } catch (error: unknown) {
-              if (debug)
-                signale.debug(
-                  `Credential-free mount failed; will prompt for credentials: ${(error as Error).message}`,
-                );
-            }
-          }
-
-          // Fall back to (Linux: start with) an explicitly credentialed mount.
-          if (!mounted) {
-            credentials = await resolveCredentials(options, osInfo, baseRemotePath);
-            try {
-              mountNixShare({
-                remotePath: sharePath,
-                mountPath: baseMountPath,
-                credentials,
-                debug,
-                osInfo,
-              });
-              // Persist the macOS Internet password so the next run is prompt-free.
-              if (osInfo.isMac && credentials?.username && credentials?.password) {
-                saveMacInternetPassword(server, credentials.username, credentials.password, debug);
-              }
-            } catch (error: unknown) {
-              handleMountError(
-                error,
-                sharePath,
-                baseMountPath,
-                baseMountPath,
-                credentials?.password,
-                debug,
-                osInfo,
-              );
-              options.onEvent?.({ type: 'mount:complete' });
-              return;
-            }
+          credentials = await resolveCredentials(options, osInfo, baseRemotePath);
+          try {
+            mountNixShare({
+              remotePath: sharePath,
+              mountPath: baseMountPath,
+              credentials,
+              debug,
+              osInfo,
+            });
+          } catch (error: unknown) {
+            handleMountError(
+              error,
+              sharePath,
+              baseMountPath,
+              baseMountPath,
+              credentials?.password,
+              debug,
+              osInfo,
+            );
+            options.onEvent?.({ type: 'mount:complete' });
+            return;
           }
         }
       }

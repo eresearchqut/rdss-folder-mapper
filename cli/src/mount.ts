@@ -426,6 +426,21 @@ export const mountNixShare = (options: NixShareMountOptions): void => {
   });
 };
 
+/**
+ * macOS only: mount an SMB share through Finder/NetFS via AppleScript. macOS
+ * handles authentication itself — the native prompt offers "Remember this
+ * password in my keychain" and, because NetAuthAgent stores the item with the
+ * correct ACL, subsequent mounts reuse it silently with no further prompt. The
+ * share is mounted under /Volumes/<share>; callers locate it with
+ * findExistingSmbMount. Throws if the user cancels or authentication fails.
+ */
+export const mountMacViaFinder = (smbUrl: string, debug = false): void => {
+  // JSON.stringify yields a double-quoted AppleScript string literal.
+  const script = `mount volume ${JSON.stringify(smbUrl)}`;
+  if (debug) signale.debug(`Executing: osascript -e '${script}'`);
+  execFileSync('osascript', ['-e', script], { stdio: debug ? 'pipe' : 'ignore' });
+};
+
 export interface SubfolderAliasOptions {
   folderMapping: FolderMapping;
   baseDir: string;
