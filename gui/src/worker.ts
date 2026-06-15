@@ -93,7 +93,7 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
         osInfo.isMac && config.host
           ? formatRemoteBase(config.host, osInfo)
               .replace(/^smb:\/\//, '')
-              .replace(/\/.*$/, '')
+              .split('/')[0]
           : undefined;
       clearCredentialsFromKeychain(config.debug, osInfo, server);
     } else if (type === 'save-credentials') {

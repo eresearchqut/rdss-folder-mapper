@@ -3,7 +3,7 @@ import { GenericContainer, Wait, StartedTestContainer } from 'testcontainers';
 import net from 'net';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 import os from 'os';
 
 const isWindows = () => {
@@ -363,8 +363,9 @@ exit 0
       };
 
       try {
-        const output = execSync(
-          `npx ts-node src/index.ts --base-dir ${testRdssDir} --host ${customRemotePath} 2>&1`,
+        const output = execFileSync(
+          'npx',
+          ['ts-node', 'src/index.ts', '--base-dir', testRdssDir, '--host', customRemotePath],
           { env, stdio: 'pipe' },
         );
         expect(output.toString()).toBeDefined();
