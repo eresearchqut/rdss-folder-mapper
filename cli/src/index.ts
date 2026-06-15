@@ -301,8 +301,13 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
 
     options.onEvent?.({ type: 'mount:start', total: folders.length });
     if (osInfo.isWindows) {
-      credentials = await resolveCredentials(options, osInfo, baseRemotePath);
       const winPrefix = prefix ? `\\${trimSlashes(prefix)}` : '';
+      // Probe the actual share path (e.g. \\host\Projects), not the bare server
+      // root: Test-Path on a server with no share always fails, which would
+      // wrongly trigger a credential prompt even when the share is reachable via
+      // the user's Windows session identity.
+      const shareProbePath = `${baseRemotePath}${winPrefix}`;
+      credentials = await resolveCredentials(options, osInfo, shareProbePath);
       for (let i = 0; i < folders.length; i++) {
         const folder = folders[i];
         const folderRemotePath = `${baseRemotePath}${winPrefix}\\${folder.id}`;
