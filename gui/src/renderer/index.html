@@ -346,8 +346,8 @@
       <button class="btn btn-primary" id="btnSave" style="flex:2">Save settings</button>
     </div>
 
-    <div class="settings-actions" style="margin-top:8px">
-      <button class="btn btn-danger" id="btnSignOut" style="flex:1">Sign out</button>
+    <div class="settings-actions hidden" id="clearKeychainRow" style="margin-top:8px">
+      <button class="btn btn-danger" id="btnClearKeychain" style="flex:1">Clear Key Chain</button>
     </div>
   </div>
 
@@ -443,7 +443,8 @@
     const btnBrowse     = document.getElementById('btnBrowse');
     const btnSave       = document.getElementById('btnSave');
     const btnCancel     = document.getElementById('btnCancel');
-    const btnSignOut    = document.getElementById('btnSignOut');
+    const btnClearKeychain = document.getElementById('btnClearKeychain');
+    const clearKeychainRow = document.getElementById('clearKeychainRow');
     const versionTag    = document.getElementById('versionTag');
     const btnActivityLog = document.getElementById('btnActivityLog');
     const btnRdssHelp    = document.getElementById('btnRdssHelp');
@@ -541,6 +542,11 @@
 
     // ── Settings toggle ──────────────────────────────────────────────────────
 
+    const refreshClearKeychainButton = () =>
+      window.api.hasStoredCredentials().then(has => {
+        clearKeychainRow.classList.toggle('hidden', !has);
+      });
+
     const showSettings = () => {
       window.api.getConfig().then(cfg => {
         currentConfig = cfg;
@@ -549,6 +555,7 @@
         panelMain.classList.add('hidden');
         panelSettings.classList.remove('hidden');
         btnSettings.classList.add('active');
+        refreshClearKeychainButton();
       });
     };
 
@@ -584,14 +591,15 @@
       showMain();
     });
 
-    btnSignOut.addEventListener('click', async () => {
-      btnSignOut.disabled = true;
-      btnSignOut.textContent = 'Signing out…';
+    btnClearKeychain.addEventListener('click', async () => {
+      btnClearKeychain.disabled = true;
+      btnClearKeychain.textContent = 'Clearing…';
       await window.api.clearAuth();
-      btnSignOut.textContent = 'Signed out ✓';
-      setTimeout(() => {
-        btnSignOut.textContent = 'Sign out';
-        btnSignOut.disabled = false;
+      btnClearKeychain.textContent = 'Cleared ✓';
+      setTimeout(async () => {
+        btnClearKeychain.textContent = 'Clear Key Chain';
+        btnClearKeychain.disabled = false;
+        await refreshClearKeychainButton();
       }, 2000);
     });
 

@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('api', {
 
   clearAuth: (): Promise<{ success: boolean }> => ipcRenderer.invoke('clear-auth'),
 
+  hasStoredCredentials: (): Promise<boolean> => ipcRenderer.invoke('has-stored-credentials'),
+
   submitCredentials: (credentials: { username: string; password: string; domain?: string }): Promise<void> =>
     ipcRenderer.invoke('submit-credentials', credentials),
 
