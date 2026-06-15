@@ -94,7 +94,23 @@ export const saveMacInternetPassword = (
 ): void => {
   try {
     if (debug) signale.debug(`Saving SMB Internet password for ${server} to macOS keychain...`);
+    // Remove any pre-existing item first so the access ACL below is applied to a
+    // fresh entry. `add-internet-password -U` updates an existing item's password
+    // but does not reliably reset its ACL, so an item previously saved without -A
+    // would keep prompting. Best-effort: ignore "item not found" failures.
+    try {
+      execFileSync('security', ['delete-internet-password', '-s', server, '-r', 'smb '], {
+        stdio: 'ignore',
+      });
+    } catch {
+      /* no existing item to remove */
+    }
     // -r "smb " is the four-character SMB protocol code (trailing space pads to 4).
+    // -A grants every application access to the item without a keychain warning.
+    // This is required so the non-interactive `mount_smbfs` probe on later runs
+    // can read the password and re-authenticate natively; without it macOS would
+    // raise a GUI keychain-access prompt that the detached probe cannot satisfy,
+    // causing the app to fall back to asking for credentials on every remap.
     const args = [
       'add-internet-password',
       '-a',
@@ -107,6 +123,7 @@ export const saveMacInternetPassword = (
       'Network Password',
       '-w',
       password,
+      '-A',
       '-U',
     ];
     execFileSync('security', args, { stdio: debug ? 'pipe' : 'ignore' });

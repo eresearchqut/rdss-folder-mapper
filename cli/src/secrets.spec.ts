@@ -142,16 +142,21 @@ describe('saveMacInternetPassword', () => {
 
     secrets.saveMacInternetPassword('rstore.qut.edu.au', 'user@qut.edu.au', 's3cr3t', false);
 
-    const call = vi.mocked(childProcess.execFileSync).mock.calls[0];
-    expect(call[0]).toBe('security');
-    const args = call[1] as string[];
-    expect(args).toContain('add-internet-password');
+    const calls = vi.mocked(childProcess.execFileSync).mock.calls;
+    // A stale item is deleted first so the new access ACL applies cleanly.
+    const deleteCall = calls.find((c) => (c[1] as string[]).includes('delete-internet-password'));
+    expect(deleteCall).toBeDefined();
+    const addCall = calls.find((c) => (c[1] as string[]).includes('add-internet-password'));
+    expect(addCall).toBeDefined();
+    expect(addCall![0]).toBe('security');
+    const args = addCall![1] as string[];
     expect(args).toContain('-r');
     expect(args).toContain('smb ');
     expect(args[args.indexOf('-s') + 1]).toBe('rstore.qut.edu.au');
     expect(args[args.indexOf('-a') + 1]).toBe('user@qut.edu.au');
     expect(args[args.indexOf('-w') + 1]).toBe('s3cr3t');
     expect(args).toContain('-U');
+    expect(args).toContain('-A');
   });
 
   it('never throws when the security command fails', () => {
