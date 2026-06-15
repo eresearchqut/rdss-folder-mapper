@@ -28,19 +28,19 @@ If these are required, the app will display a **credentials dialog** before moun
 This prompt only appears when the storage server requires explicit credentials that your current session does not already provide. Many environments handle this automatically and this dialog will never appear.
 :::
 
-### 3. Re-authentication after sign out or token expiry
+### 3. Re-authentication after token expiry
 
-If you click **Sign Out** or your session token expires, the next time you click **Connect Research Folders** your browser will open to the institutional login page again.
+Your session token is kept only in memory for the lifetime of the app — it is never saved. When it expires, or after you restart the app, the next time you click **Connect Research Folders** your browser will open to the institutional login page again.
 
 ---
 
 ## What is stored and where
 
-All credentials are stored exclusively in your **operating system's secure credential store**. Nothing is written to a plain text file on disk.
+All network storage credentials are stored exclusively in your **operating system's secure credential store**. Nothing is written to a plain text file on disk.
 
 | What | Where | Purpose |
 |------|-------|---------|
-| Session token (OAuth) | OS keychain / credential manager | Authorises calls to the research folder API |
+| Session token (OAuth) | In memory only (current app session) | Authorises calls to the research folder API |
 | Network storage credentials | OS keychain / credential manager | Mounts the file server without re-prompting every session |
 | App settings | User data folder (`config.json`) | Remembers your chosen base folder and debug preference |
 
@@ -69,8 +69,8 @@ Credentials stored in the OS keychain are:
 
 To remove everything this app has stored:
 
-1. Click **Sign Out** in the main window — this clears your session token from the keychain.
-2. If you were ever prompted for network storage credentials, these are also cleared when you sign out.
+1. Open **Settings** and click **Clear Key Chain** — this removes any saved network storage credentials from your keychain. The button appears only when there is something stored to clear.
+2. Your OAuth session token is never written to the keychain, so there is nothing to remove — it is discarded automatically when the app closes.
 
 To verify or manually remove entries, open your OS credential store:
 - **macOS**: Open **Keychain Access** and search for `rdss-folder-mapper`

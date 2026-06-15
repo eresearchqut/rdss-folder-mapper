@@ -24,11 +24,12 @@ rdss-folder-mapper [options] [command]
 | `-V, --version` | — | Print the version number and exit. |
 | `-d, --debug` | `false` | Enable verbose debug logging. |
 | `-b, --base-dir <path>` | `~/Desktop/RDSS Folders` | Directory where folder shortcuts are created. |
-| `-r, --remote-path <path>` | From `config.json` | Network path to your institution's research storage. |
+| `-r, --host <host>` | From `config.json` | Override the remote storage host. On macOS/Linux pair it with `--volume`. |
+| `--volume <volume>` | From `config.json` | Share/volume within the host to mount (macOS/Linux only). |
 | `-f, --folders <path>` | `folders.json` | Custom path to a folders JSON file. |
 | `-t, --truncate <number>` | — | Truncate folder name display to this many characters. |
-| `--refresh` | — | Refresh mappings without removing existing ones first. |
-| `--force` | — | Re-create mappings even if they already exist. |
+| `--refresh` | — | Force login and fetch the folder list from the DMP server even if `folders.json` exists. |
+| `--force` | — | Force a new login, ignoring any cached session token. |
 
 ## Examples
 
