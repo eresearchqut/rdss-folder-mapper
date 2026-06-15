@@ -51,6 +51,6 @@ Settings such as the remote storage path and authentication details are configur
 
 ## Credentials & privacy
 
-The app signs you in via your institution's standard login page — it never sees your password. Network storage credentials (if required) are stored securely in your OS keychain and can be removed at any time via **Sign Out**.
+The app signs you in via your institution's standard login page — it never sees your password. Network storage credentials (if required) are stored securely in your OS keychain and can be removed at any time via the **Clear Key Chain** button in **Settings** — it appears only when there is something stored to clear.
 
 [→ Read the full Your Data & Privacy page](/guide/privacy)
