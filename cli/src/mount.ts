@@ -366,6 +366,12 @@ export interface NixShareMountOptions {
   remotePath: string;
   mountPath: string;
   credentials?: Credentials;
+  /**
+   * macOS only: username to embed in the credential-free probe URL so the OS can
+   * match and reuse the saved SMB Internet password from the keychain without
+   * prompting. When omitted the probe is fully anonymous.
+   */
+  probeUsername?: string;
   debug?: boolean;
   osInfo: OsInfo;
 }
@@ -377,7 +383,7 @@ export interface NixShareMountOptions {
  * embedded-credential URL only if that fails.
  */
 export const mountNixShare = (options: NixShareMountOptions): void => {
-  const { remotePath, mountPath, credentials, debug = false, osInfo } = options;
+  const { remotePath, mountPath, credentials, probeUsername, debug = false, osInfo } = options;
   if (!fs.existsSync(mountPath)) {
     fs.mkdirSync(mountPath, { recursive: true });
   }
@@ -389,7 +395,12 @@ export const mountNixShare = (options: NixShareMountOptions): void => {
     // probe: if no reusable session/keychain entry exists we fail fast and fall
     // back to an explicit, non-interactive credentialed mount.
     const baseOpts = { stdio: debug ? 'pipe' : 'ignore', detached: true } as const;
-    const { url: plainUrl } = buildMacSmbUrl(remotePath);
+    // Embed the username (no password) in the probe URL so the OS can resolve the
+    // saved SMB Internet password for that account from the keychain.
+    const probeRemote = probeUsername
+      ? remotePath.replace(/^smb:\/\//, `smb://${encodeURIComponent(probeUsername)}@`)
+      : remotePath;
+    const { url: plainUrl } = buildMacSmbUrl(probeRemote);
     try {
       if (debug)
         signale.debug(`Executing: mount_smbfs "${plainUrl}" "${mountPath}" (reuse session/keychain)`);

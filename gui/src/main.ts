@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { Worker } from 'worker_threads';
-import { BASE_DIR } from 'rdss-folder-mapper';
+import { BASE_DIR, formatRemoteBase, getMacInternetPasswordAccount, getOs } from 'rdss-folder-mapper';
 
 let mainWindow: BrowserWindow | null = null;
 let activeWorker: import('worker_threads').Worker | null = null;
@@ -180,8 +180,19 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
       } else if (msg.type === 'event') {
         mainWindow?.webContents.send('event', msg.event);
       } else if (msg.type === 'credentials-required') {
+        // On macOS the username is stored on the SMB Internet password; prefer it
+        // so the dialog shows (and lets the user update) the saved account.
+        let defaultUsername = os.userInfo().username;
+        if (process.platform === 'darwin' && deployRemotePath) {
+          try {
+            const server = formatRemoteBase(deployRemotePath, getOs())
+              .replace(/^smb:\/\//, '')
+              .replace(/\/.*$/, '');
+            defaultUsername = getMacInternetPasswordAccount(server, config.debug ?? false) ?? defaultUsername;
+          } catch { /* fall back to the OS login name */ }
+        }
         mainWindow?.webContents.send('credentials-required', {
-          defaultUsername: os.userInfo().username,
+          defaultUsername,
           adDomainConfigured: Boolean(deployConfig.adDomain),
         });
       } else if (msg.type === 'done') {

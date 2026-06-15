@@ -19,6 +19,7 @@ import {
   saveCredentialsToKeychain,
   clearCredentialsFromKeychain,
   saveMacInternetPassword,
+  getMacInternetPasswordAccount,
   Credentials,
 } from './secrets';
 import { getOs, OsInfo } from './os';
@@ -42,7 +43,7 @@ export { transformPlansToFolders, performLogin };
 export type { AuthEvent } from './auth';
 export { reset } from './mount';
 export { getOs } from './os';
-export { clearCredentialsFromKeychain, getCredentialsFromKeychain, saveCredentialsToKeychain } from './secrets';
+export { clearCredentialsFromKeychain, getCredentialsFromKeychain, saveCredentialsToKeychain, getMacInternetPasswordAccount } from './secrets';
 export type { Credentials } from './secrets';
 
 export type RefreshEvent =
@@ -137,6 +138,26 @@ export const formatRemoteBase = (value: string, osInfo: OsInfo): string => {
   return osInfo.isWindows ? `\\\\${bare.replace(/\//g, '\\')}` : `smb://${bare.replace(/\\/g, '/')}`;
 };
 
+/**
+ * Read config.json and derive the bare SMB server host (e.g. "rstore.qut.edu.au")
+ * from the configured remote path for the current platform. Returns undefined
+ * when config.json is missing/unparseable or no remote path is configured.
+ */
+const readRemoteServer = (osInfo: OsInfo): string | undefined => {
+  if (!fs.existsSync('config.json')) return undefined;
+  try {
+    const parsed = JSON.parse(fs.readFileSync('config.json', 'utf8'));
+    const raw =
+      parsed.remotePath || (osInfo.isWindows ? parsed.remotePathWin : parsed.remotePathNix);
+    if (!raw) return undefined;
+    return formatRemoteBase(raw, osInfo)
+      .replace(/^smb:\/\//, '')
+      .replace(/\/.*$/, '');
+  } catch {
+    return undefined;
+  }
+};
+
 
 export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
   const osInfo = getOs();
@@ -184,7 +205,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         debug,
         force,
         onEvent: (e) => options.onEvent?.(e),
-      }, osInfo);
+      });
       if (!token) {
         throw new Error('Failed to retrieve access token during login.');
       }
@@ -244,7 +265,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       signale.success(`Successfully mapped plans and saved to ${foldersFile}`);
     }
 
-    const folders = await loadFoldersConfig(foldersFile, debug, osInfo);
+    const folders = await loadFoldersConfig(foldersFile, debug);
     const mountsDir = setupBaseDirectory(baseDir, debug, osInfo);
 
     // Priority: explicit option / config.json > REMOTE_PATH env vars (CI/testing only)
@@ -262,11 +283,11 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       remotePrefix ||
       (osInfo.isWindows ? process.env.REMOTE_PREFIX_WIN : process.env.REMOTE_PREFIX_NIX);
 
-    credentials = await resolveCredentials(options, osInfo, baseRemotePath);
+    credentials = undefined;
 
     options.onEvent?.({ type: 'mount:start', total: folders.length });
-
     if (osInfo.isWindows) {
+      credentials = await resolveCredentials(options, osInfo, baseRemotePath);
       const winPrefix = prefix ? `\\${prefix.replace(/^[\\/]+|[\\/]+$/g, '')}` : '';
       for (let i = 0; i < folders.length; i++) {
         const folder = folders[i];
@@ -302,30 +323,61 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         baseMountPath = path.join(mountsDir, mountDirName);
         if (!isMounted(baseMountPath, baseMountPath, osInfo)) {
           signale.info(`Mounting share ${sharePath} to ${baseMountPath}`);
-          try {
-            mountNixShare({
-              remotePath: sharePath,
-              mountPath: baseMountPath,
-              credentials,
-              debug,
-              osInfo,
-            });
-          } catch (error: unknown) {
-            handleMountError(
-              error,
-              sharePath,
-              baseMountPath,
-              baseMountPath,
-              credentials?.password,
-              debug,
-              osInfo,
-            );
-            options.onEvent?.({ type: 'mount:complete' });
-            return;
+          let mounted = false;
+
+          // macOS: first try a credential-free mount using the username stored on
+          // the SMB Internet password (or the macOS login name). The OS supplies
+          // the saved password from the keychain, so there is no prompt.
+          if (osInfo.isMac) {
+            const probeUsername =
+              getMacInternetPasswordAccount(server, debug) || os.userInfo().username;
+            try {
+              mountNixShare({
+                remotePath: sharePath,
+                mountPath: baseMountPath,
+                probeUsername,
+                debug,
+                osInfo,
+              });
+              mounted = true;
+              if (debug) signale.debug('Mounted share using saved macOS credentials.');
+            } catch (error: unknown) {
+              if (debug)
+                signale.debug(
+                  `Credential-free mount failed; will prompt for credentials: ${(error as Error).message}`,
+                );
+            }
           }
-        }
-        if (osInfo.isMac && credentials?.username && credentials?.password) {
-          saveMacInternetPassword(server, credentials.username, credentials.password, debug);
+
+          // Fall back to (Linux: start with) an explicitly credentialed mount.
+          if (!mounted) {
+            credentials = await resolveCredentials(options, osInfo, baseRemotePath);
+            try {
+              mountNixShare({
+                remotePath: sharePath,
+                mountPath: baseMountPath,
+                credentials,
+                debug,
+                osInfo,
+              });
+              // Persist the macOS Internet password so the next run is prompt-free.
+              if (osInfo.isMac && credentials?.username && credentials?.password) {
+                saveMacInternetPassword(server, credentials.username, credentials.password, debug);
+              }
+            } catch (error: unknown) {
+              handleMountError(
+                error,
+                sharePath,
+                baseMountPath,
+                baseMountPath,
+                credentials?.password,
+                debug,
+                osInfo,
+              );
+              options.onEvent?.({ type: 'mount:complete' });
+              return;
+            }
+          }
         }
       }
 
@@ -421,10 +473,18 @@ program
 
 program
   .command('auth')
-  .description('Set credentials in the keychain')
+  .description('Store SMB credentials for connecting to the RDSS share')
   .action(() => {
     const osInfo = getOs();
     const debug = program.opts().debug || false;
+
+    if (osInfo.isWindows) {
+      signale.info(
+        'On Windows the RDSS share is accessed with your logged-in session identity; no credentials need to be stored.',
+      );
+      return;
+    }
+
     const currentUser = os.userInfo().username;
     const usernameInput = readlineSync.question(
       `Enter username (leave blank to use current user - ${currentUser}): `,
@@ -435,21 +495,43 @@ program
       hideEchoBack: true,
     });
 
+    if (osInfo.isMac) {
+      const server = readRemoteServer(osInfo);
+      if (!server) {
+        signale.error(
+          'Could not determine the SMB server from config.json. Set "remotePath" (or "remotePathNix").',
+        );
+        process.exitCode = 1;
+        return;
+      }
+      saveMacInternetPassword(server, username, password, debug);
+      signale.success(`Saved SMB credentials for ${server} to the macOS keychain.`);
+      return;
+    }
+
     const domainInput = readlineSync.question('Enter AD domain (optional): ');
     const adDomain = domainInput.trim() || undefined;
-
     saveCredentialsToKeychain({ username, password, adDomain }, debug, osInfo);
     signale.success('Successfully updated credentials in keychain.');
   });
 
 program
   .command('clear-auth')
-  .description('Clear all credentials from the keychain')
+  .description('Clear stored SMB credentials')
   .action(() => {
     const osInfo = getOs();
     const debug = program.opts().debug || false;
-    clearCredentialsFromKeychain(debug, osInfo);
-    signale.success('Successfully cleared credentials from keychain.');
+
+    if (osInfo.isWindows) {
+      signale.info(
+        'On Windows the RDSS share uses your logged-in session identity; there are no stored credentials to clear.',
+      );
+      return;
+    }
+
+    const server = osInfo.isMac ? readRemoteServer(osInfo) : undefined;
+    clearCredentialsFromKeychain(debug, osInfo, server);
+    signale.success('Successfully cleared credentials.');
   });
 
 if (require.main === module) {

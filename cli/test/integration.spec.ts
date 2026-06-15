@@ -115,6 +115,19 @@ exit 0
 `;
       fs.writeFileSync(path.join(mockBinDir, 'security'), mockScript, { mode: 0o755 });
       fs.writeFileSync(path.join(mockBinDir, 'secret-tool'), mockScript, { mode: 0o755 });
+
+      // macOS now authenticates via the native SMB Internet password, which a
+      // mock `security` cannot write to the real keychain that the real
+      // mount_smbfs reads. Mock mount_smbfs so the mount/alias orchestration is
+      // exercised deterministically: it creates the mount point and the expected
+      // `proj_alpha` subfolder so subfolder aliasing succeeds. (Real Samba auth
+      // is still covered by the smbclient test below.)
+      const mockMountSmbfs = `#!/bin/bash
+mountpath="\${@: -1}"
+mkdir -p "$mountpath/proj_alpha"
+exit 0
+`;
+      fs.writeFileSync(path.join(mockBinDir, 'mount_smbfs'), mockMountSmbfs, { mode: 0o755 });
     });
 
     beforeEach(() => {

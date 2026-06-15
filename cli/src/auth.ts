@@ -1,7 +1,5 @@
 import signale from 'signale';
 import { createHash, randomBytes } from 'crypto';
-import { getTokenFromKeychain, saveTokenToKeychain } from './secrets';
-import { OsInfo } from './os';
 
 export type AuthEvent =
   | { type: 'auth:browser-opened'; url: string }
@@ -17,6 +15,38 @@ export interface LoginOptions {
 }
 
 const REDACTED = '[REDACTED]';
+
+// In-memory OAuth token cache. The token lives only for the lifetime of the
+// process (the CLI re-authenticates each run; the GUI worker thread persists for
+// its session). It is never written to disk or the OS keychain.
+let cachedToken: string | undefined;
+
+const isTokenValid = (token: string): boolean => {
+  try {
+    const payloadBase64 = token.split('.')[1];
+    if (!payloadBase64) return false;
+    const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
+    return !payload.exp || payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Return the cached OAuth token if one is held in memory and has not expired.
+ * Expired or missing tokens yield undefined (and clear the cache).
+ */
+export const getCachedToken = (): string | undefined => {
+  if (cachedToken && isTokenValid(cachedToken)) {
+    return cachedToken;
+  }
+  cachedToken = undefined;
+  return undefined;
+};
+
+export const setCachedToken = (token: string | undefined): void => {
+  cachedToken = token;
+};
 
 export const redactHeaders = (headers: Record<string, string>): Record<string, string> => {
   const result: Record<string, string> = {};
@@ -57,7 +87,7 @@ export const setupFetchMiddleware = (debug: boolean) => {
   };
 };
 
-export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promise<string | undefined> => {
+export const performLogin = async (options: LoginOptions): Promise<string | undefined> => {
   const { clientId, authDomain, callbackUrls, debug, force, onEvent } = options;
   const authUrl = `https://${authDomain}/oauth2/authorize`;
   const tokenUrl = `https://${authDomain}/oauth2/token`;
@@ -65,21 +95,10 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
   setupFetchMiddleware(debug);
 
   if (!force) {
-    const existingToken = getTokenFromKeychain(debug, osInfo);
+    const existingToken = getCachedToken();
     if (existingToken) {
-      try {
-        const payloadBase64 = existingToken.split('.')[1];
-        if (payloadBase64) {
-          const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf8');
-          const payload = JSON.parse(payloadJson);
-          if (!payload.exp || payload.exp * 1000 > Date.now()) {
-            if (debug) signale.debug('Valid token found in keychain.');
-            return existingToken;
-          }
-        }
-      } catch {
-        if (debug) signale.debug('Failed to parse existing token from keychain.');
-      }
+      if (debug) signale.debug('Valid token found in memory.');
+      return existingToken;
     }
   }
 
@@ -186,8 +205,8 @@ export const performLogin = async (options: LoginOptions, osInfo: OsInfo): Promi
 
                 const tokenData = (await response.json()) as { id_token?: string };
                 if (tokenData.id_token) {
-                  saveTokenToKeychain(tokenData.id_token, debug, osInfo);
-                  signale.success('Successfully logged in and saved token.');
+                  setCachedToken(tokenData.id_token);
+                  signale.success('Successfully logged in.');
                   onEvent?.({ type: 'auth:complete' });
                   server.close(() => resolve(tokenData.id_token));
                   return;
