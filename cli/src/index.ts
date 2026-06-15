@@ -123,6 +123,21 @@ const resolveCredentials = async (
 };
 
 
+/**
+ * Normalize a configured remote into a platform-appropriate base path. Accepts a
+ * bare host ("rstore.qut.edu.au"), an `smb://` URL, or a `\\` UNC path and
+ * formats it for the current OS: `smb://host` on nix, `\\host` on Windows. This
+ * lets a single `remotePath` value be shared across platforms.
+ */
+export const formatRemoteBase = (value: string, osInfo: OsInfo): string => {
+  const bare = value
+    .replace(/^smb:\/\//i, '')
+    .replace(/^\\\\/, '')
+    .replace(/^\/+/, '');
+  return osInfo.isWindows ? `\\\\${bare.replace(/\//g, '\\')}` : `smb://${bare.replace(/\\/g, '/')}`;
+};
+
+
 export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
   const osInfo = getOs();
   const {
@@ -234,21 +249,28 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
 
     // Priority: explicit option / config.json > REMOTE_PATH env vars (CI/testing only)
     const envPath = osInfo.isWindows ? process.env.REMOTE_PATH_WIN : process.env.REMOTE_PATH_NIX;
-    const baseRemotePath = remotePath || envPath;
-    if (!baseRemotePath) {
+    const rawRemotePath = remotePath || envPath;
+    if (!rawRemotePath) {
       throw new Error(
-        'No remote path configured. Set "remotePathNix" / "remotePathWin" in config.json, or use --remote-path.',
+        'No remote path configured. Set "remotePath" (or "remotePathNix" / "remotePathWin") in config.json, or use --remote-path.',
       );
     }
+    const baseRemotePath = formatRemoteBase(rawRemotePath, osInfo);
+
+    // The share/subpath to mount, shared across platforms (e.g. "Projects").
+    const prefix =
+      remotePrefix ||
+      (osInfo.isWindows ? process.env.REMOTE_PREFIX_WIN : process.env.REMOTE_PREFIX_NIX);
 
     credentials = await resolveCredentials(options, osInfo, baseRemotePath);
 
     options.onEvent?.({ type: 'mount:start', total: folders.length });
 
     if (osInfo.isWindows) {
+      const winPrefix = prefix ? `\\${prefix.replace(/^[\\/]+|[\\/]+$/g, '')}` : '';
       for (let i = 0; i < folders.length; i++) {
         const folder = folders[i];
-        const folderRemotePath = `${baseRemotePath}\\${folder.id}`;
+        const folderRemotePath = `${baseRemotePath}${winPrefix}\\${folder.id}`;
 
         processFolderMapping({
           folderMapping: folder,
@@ -267,7 +289,6 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       }
     } else {
       // nix: connect to the share root once, then alias each subfolder into it.
-      const prefix = remotePrefix || process.env.REMOTE_PREFIX_NIX;
       const sharePath = prefix ? `${baseRemotePath}/${prefix}` : baseRemotePath;
       const server = baseRemotePath.replace(/^smb:\/\//, '').replace(/\/.*$/, '');
       const share = prefix || sharePath.replace(/^smb:\/\//, '').replace(/^[^/]*\/?/, '');

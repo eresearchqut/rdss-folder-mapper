@@ -133,28 +133,28 @@ Place a `config.json` next to the executable to set default options:
   "debug": true,
   "baseDir": "~/MyRDSS",
   "truncateLength": 30,
-  "remotePathNix": "smb://rstore.example.edu",
-  "remotePrefixNix": "projects",
-  "remotePathWin": "\\\\rstore.example.edu"
+  "remotePath": "rstore.example.edu",
+  "remotePrefix": "Projects"
 }
 ```
 
 _For security reasons, `username`, `password`, and `domain` cannot be set in `config.json`. Use `auth` instead._
 
-### Remote paths and the nix mount model
+### Remote paths and the mount model
 
-The remote server is configured per platform via `remotePathNix` / `remotePathWin`
-(or `--remote-path`). On macOS and Linux the CLI connects to the share **once**
-and then creates symlink aliases to each project subfolder, instead of mounting
-every folder separately. This avoids repeated authentication prompts.
+The remote server is configured with `remotePath` (a bare host, e.g.
+`rstore.example.edu`) plus a `remotePrefix` (the share/subpath, e.g. `Projects`).
+The CLI formats `remotePath` per platform automatically — `smb://host` on
+macOS/Linux and `\\host` on Windows — so a single value works everywhere. (You
+can still override per platform with `remotePathNix` / `remotePathWin` and
+`remotePrefixNix` / `remotePrefixWin`, or with `--remote-path` / `--remote-prefix`.)
 
-- `remotePathNix` is the server/share root, e.g. `smb://rstore.example.edu`.
-- `remotePrefixNix` (or `--remote-prefix`) is the share/subpath to mount once,
-  e.g. `projects`. The share is mounted at `<baseDir>/.mounts/<prefix>` and each
-  folder `id` is aliased from `<baseDir>/<Name [id]>` to `.mounts/<prefix>/<id>`.
-- On macOS the share credential is also saved as a keychain Internet password so
-  Finder and subsequent connections re-authenticate without prompting.
-- Windows is unchanged: each folder is still mapped individually.
+- **macOS / Linux**: the share `host/prefix` is mounted **once** at
+  `<baseDir>/.mounts/<prefix>`, and each folder `id` is aliased from
+  `<baseDir>/<Name [id]>` to `.mounts/<prefix>/<id>`. This avoids repeated
+  authentication prompts. On macOS the share credential is also saved as a
+  keychain Internet password so Finder re-authenticates silently.
+- **Windows**: each folder is mapped individually at `\\host\prefix\<id>`.
 
 ## Remote Configuration & OAuth Login
 
