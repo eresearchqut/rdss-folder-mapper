@@ -44,7 +44,7 @@ describe('getCredentialsFromKeychain', () => {
 
     const creds = secrets.getCredentialsFromKeychain(false, osInfo);
 
-    expect(creds).toEqual({ username: 'alice', password: 'secretpw', adDomain: 'QUT' });
+    expect(creds).toEqual({ username: 'alice', password: 'secretpw', domain: 'QUT' });
   });
 
   it('returns empty credentials on macOS (native Internet password is used instead)', () => {
@@ -72,7 +72,7 @@ describe('saveCredentialsToKeychain', () => {
     vi.mocked(childProcess.execFileSync).mockReturnValue(Buffer.from(''));
 
     secrets.saveCredentialsToKeychain(
-      { username: 'alice', password: 'pw', adDomain: 'QUT' },
+      { username: 'alice', password: 'pw', domain: 'QUT' },
       false,
       osInfo,
     );

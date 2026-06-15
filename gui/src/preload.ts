@@ -29,10 +29,10 @@ contextBridge.exposeInMainWorld('api', {
 
   clearAuth: (): Promise<{ success: boolean }> => ipcRenderer.invoke('clear-auth'),
 
-  submitCredentials: (credentials: { username: string; password: string; adDomain?: string }): Promise<void> =>
+  submitCredentials: (credentials: { username: string; password: string; domain?: string }): Promise<void> =>
     ipcRenderer.invoke('submit-credentials', credentials),
 
-  onCredentialsRequired: (callback: (data: { defaultUsername: string; adDomainConfigured?: boolean }) => void) => {
+  onCredentialsRequired: (callback: (data: { defaultUsername: string; domainConfigured?: boolean }) => void) => {
     ipcRenderer.on('credentials-required', (_event, data) => callback(data));
   },
 

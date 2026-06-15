@@ -256,7 +256,7 @@ describe('mount.ts unit tests', () => {
       return { domain: match[1], user: match[2], password: match[3], hostAndShare: match[4] };
     };
 
-    const callMountMac = (password: string, username = 'testuser', adDomain?: string) => {
+    const callMountMac = (password: string, username = 'testuser', domain?: string) => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.mocked(fs.existsSync).mockReturnValue(false);
       vi.mocked(fs.symlinkSync).mockReturnValue(undefined as any);
@@ -268,7 +268,7 @@ describe('mount.ts unit tests', () => {
         baseDir: '/home/user/Desktop/RDSS Folders',
         os: 'darwin' as any,
         debug: false,
-        credentials: { username, password, adDomain },
+        credentials: { username, password, domain },
       });
 
       const args = vi.mocked(child_process.execFileSync).mock.calls[0][1] as string[];
@@ -365,7 +365,7 @@ describe('mount.ts unit tests', () => {
       baseDir: '/home/user/Desktop/RDSS',
       os: 'linux' as any,
       debug: false,
-      credentials: { username: 'user', password: 's3cr3t', adDomain: 'qutad' },
+      credentials: { username: 'user', password: 's3cr3t', domain: 'qutad' },
       });
 
       expect(child_process.execFileSync).toHaveBeenCalledWith(
@@ -415,7 +415,7 @@ describe('mount.ts unit tests', () => {
       const { url, logUrl } = buildMacSmbUrl('smb://host/projects', {
         username: 'user@qut.edu.au',
         password: 'p@ss:word',
-        adDomain: 'qutad',
+        domain: 'qutad',
       });
       expect(url).toBe('smb://qutad;user%40qut.edu.au:p%40ss%3Aword@host/projects');
       expect(logUrl).toBe('smb://qutad;user%40qut.edu.au:***@host/projects');
@@ -435,7 +435,7 @@ describe('mount.ts unit tests', () => {
       const { url, opts, logOpts } = buildLinuxCifsMount('smb://host/projects', {
         username: 'user',
         password: 's3cr3t',
-        adDomain: 'qutad',
+        domain: 'qutad',
       });
       expect(url).toBe('//host/projects');
       expect(opts).toBe('username=user,password=s3cr3t,domain=qutad');
@@ -540,7 +540,7 @@ describe('mount.ts unit tests', () => {
       mountNixShare({
         remotePath: 'smb://host/projects',
         mountPath: '/base/.mounts/projects',
-        credentials: { username: 'user', password: 'pw', adDomain: 'qutad' },
+        credentials: { username: 'user', password: 'pw', domain: 'qutad' },
         osInfo: linuxOs(),
       });
 

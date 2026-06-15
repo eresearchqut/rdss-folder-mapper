@@ -224,7 +224,7 @@ export interface MountOptions {
 
 export const mountWindows = (options: MountOptions) => {
   const { remotePath, localPath, credentials, debug = false } = options;
-  const { username, password, adDomain } = credentials || {};
+  const { username, password, domain } = credentials || {};
   const existingIsFolder = isExistingFolder(localPath);
   if (existingIsFolder) {
     try {
@@ -234,7 +234,7 @@ export const mountWindows = (options: MountOptions) => {
     }
   }
   if (username && password) {
-    const userWithDomain = adDomain ? `${adDomain}\\${username}` : username;
+    const userWithDomain = domain ? `${domain}\\${username}` : username;
     if (debug) signale.debug(`Executing: net use "${remotePath}" "***" /user:"${userWithDomain}"`);
     execFileSync(netExe, ['use', remotePath, password, `/user:${userWithDomain}`], {
       stdio: debug ? 'pipe' : 'ignore',
@@ -258,11 +258,11 @@ export const buildMacSmbUrl = (
   remotePath: string,
   credentials?: Credentials,
 ): { url: string; logUrl: string } => {
-  const { username, password, adDomain } = credentials || {};
+  const { username, password, domain } = credentials || {};
   let url = remotePath;
   let logUrl = remotePath;
   if (username && password && remotePath.startsWith('smb://')) {
-    const domainPrefix = adDomain ? `${encodeURIComponent(adDomain)};` : '';
+    const domainPrefix = domain ? `${encodeURIComponent(domain)};` : '';
     url = remotePath.replace(
       'smb://',
       `smb://${domainPrefix}${encodeURIComponent(username)}:${encodeURIComponent(password)}@`,
@@ -313,12 +313,12 @@ export const buildLinuxCifsMount = (
   remotePath: string,
   credentials?: Credentials,
 ): { url: string; opts: string; logOpts: string } => {
-  const { username, password, adDomain } = credentials || {};
+  const { username, password, domain } = credentials || {};
   const url = remotePath.startsWith('smb://') ? remotePath.replace('smb://', '//') : remotePath;
   const opts =
-    username && password ? `username=${username},password=${password},domain=${adDomain}` : 'guest';
+    username && password ? `username=${username},password=${password},domain=${domain}` : 'guest';
   const logOpts =
-    username && password ? `username=${username},password=***,domain=${adDomain}` : 'guest';
+    username && password ? `username=${username},password=***,domain=${domain}` : 'guest';
   return { url, opts, logOpts };
 };
 

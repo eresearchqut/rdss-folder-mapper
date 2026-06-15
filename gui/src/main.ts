@@ -28,13 +28,13 @@ interface DeploymentConfig {
   clientId?: string;
   authDomain?: string;
   callbackUrls?: string[];
-  adDomain?: string;
-  remotePath?: string;
-  remotePathNix?: string;
-  remotePathWin?: string;
-  remotePrefix?: string;
-  remotePrefixNix?: string;
-  remotePrefixWin?: string;
+  domain?: string;
+  host?: string;
+  hostNix?: string;
+  hostWin?: string;
+  volume?: string;
+  volumeNix?: string;
+  volumeWin?: string;
 }
 
 const configPath = () => path.join(app.getPath('userData'), 'config.json');
@@ -150,17 +150,17 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
   new Promise((resolve) => {
     const deployConfig = loadDeploymentConfig();
     const osInfo = process.platform === 'win32';
-    const deployRemotePath = deployConfig.remotePath
-      ?? (osInfo ? deployConfig.remotePathWin : deployConfig.remotePathNix);
-    const deployRemotePrefix = deployConfig.remotePrefix
-      ?? (osInfo ? deployConfig.remotePrefixWin : deployConfig.remotePrefixNix);
+    const deployRemotePath = deployConfig.host
+      ?? (osInfo ? deployConfig.hostWin : deployConfig.hostNix);
+    const deployRemotePrefix = deployConfig.volume
+      ?? (osInfo ? deployConfig.volumeWin : deployConfig.volumeNix);
 
     const workerConfig = {
       ...deployConfig,
       debug: config.debug,
       baseDir: config.baseDir,
-      remotePath: deployRemotePath,
-      remotePrefix: deployRemotePrefix,
+      host: deployRemotePath,
+      volume: deployRemotePrefix,
       foldersFile: path.join(app.getPath('userData'), 'folders.json'),
     };
 
@@ -193,7 +193,7 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
         }
         mainWindow?.webContents.send('credentials-required', {
           defaultUsername,
-          adDomainConfigured: Boolean(deployConfig.adDomain),
+          domainConfigured: Boolean(deployConfig.domain),
         });
       } else if (msg.type === 'done') {
         activeWorker = null;
@@ -321,7 +321,7 @@ ipcMain.handle('clear-auth', async () => {
   return runInWorker('clear-auth', loadConfig());
 });
 
-ipcMain.handle('submit-credentials', async (_event, credentials: { username: string; password: string; adDomain?: string }) => {
+ipcMain.handle('submit-credentials', async (_event, credentials: { username: string; password: string; domain?: string }) => {
   activeWorker?.postMessage({ type: 'credentials-response', credentials });
 });
 

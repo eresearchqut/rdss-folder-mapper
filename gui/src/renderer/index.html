@@ -386,13 +386,13 @@
     const btnCredCancel    = document.getElementById('btnCredCancel');
     const btnCredSubmit    = document.getElementById('btnCredSubmit');
 
-    const showCredentialsModal = (defaultUsername = '', adDomainConfigured = false) => {
+    const showCredentialsModal = (defaultUsername = '', domainConfigured = false) => {
       credUsername.value = defaultUsername;
       credPassword.value = '';
       credDomain.value   = '';
       // When the deployment config.json already specifies an AD domain, don't
       // offer an input to change it.
-      credDomainField.classList.toggle('hidden', adDomainConfigured);
+      credDomainField.classList.toggle('hidden', domainConfigured);
       modalCredentials.classList.remove('hidden');
       (defaultUsername ? credPassword : credUsername).focus();
     };
@@ -418,14 +418,14 @@
       credUsername.style.borderColor = '';
       credPassword.style.borderColor = '';
       hideCredentialsModal();
-      const adDomain = credDomain.value.trim() || undefined;
-      await window.api.submitCredentials({ username, password, adDomain });
+      const domain = credDomain.value.trim() || undefined;
+      await window.api.submitCredentials({ username, password, domain });
     });
 
     credPassword.addEventListener('keydown', e => { if (e.key === 'Enter') btnCredSubmit.click(); });
 
-    window.api.onCredentialsRequired(({ defaultUsername, adDomainConfigured }) =>
-      showCredentialsModal(defaultUsername, adDomainConfigured));
+    window.api.onCredentialsRequired(({ defaultUsername, domainConfigured }) =>
+      showCredentialsModal(defaultUsername, domainConfigured));
 
     const panelMain     = document.getElementById('panelMain');
     const panelSettings = document.getElementById('panelSettings');

@@ -88,7 +88,7 @@ describe('Mount Integration Test', () => {
     const mockBinDir = path.join(process.cwd(), '.test', 'bin');
     // The new nix model mounts a single share (the prefix) once, then aliases
     // subfolders by id within it. `test_share` is the Samba share name.
-    const remotePrefixNix = 'test_share';
+    const volumeNix = 'test_share';
 
     beforeAll(() => {
       fs.mkdirSync(mockBinDir, { recursive: true });
@@ -167,7 +167,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        REMOTE_PREFIX_NIX: remotePrefixNix,
+        REMOTE_PREFIX_NIX: volumeNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -195,7 +195,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        REMOTE_PREFIX_NIX: remotePrefixNix,
+        REMOTE_PREFIX_NIX: volumeNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -234,7 +234,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        REMOTE_PREFIX_NIX: remotePrefixNix,
+        REMOTE_PREFIX_NIX: volumeNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -286,7 +286,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        REMOTE_PREFIX_NIX: remotePrefixNix,
+        REMOTE_PREFIX_NIX: volumeNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 
@@ -323,7 +323,7 @@ exit 0
       }
     });
 
-    test('should use custom remote path when --remote-path is provided', async () => {
+    test('should use custom remote host when --host is provided', async () => {
       // Use an invalid host so it fails to mount reliably, allowing us to inspect the error string
       const customRemotePath = isWindows()
         ? '\\\\invalid-test-host'
@@ -332,7 +332,7 @@ exit 0
 
       try {
         const output = execSync(
-          `npx ts-node src/index.ts --base-dir ${testRdssDir} --remote-path ${customRemotePath} 2>&1`,
+          `npx ts-node src/index.ts --base-dir ${testRdssDir} --host ${customRemotePath} 2>&1`,
           { env, stdio: 'pipe' },
         );
         expect(output.toString()).toBeDefined();
@@ -396,7 +396,7 @@ exit 0
         ...process.env,
         REMOTE_PATH_WIN: basePathWin,
         REMOTE_PATH_NIX: basePathNix,
-        REMOTE_PREFIX_NIX: remotePrefixNix,
+        REMOTE_PREFIX_NIX: volumeNix,
         PATH: `${mockBinDir}:${process.env.PATH}`,
       };
 

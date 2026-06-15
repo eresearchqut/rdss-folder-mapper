@@ -64,9 +64,9 @@ interface RefreshOptions {
   debug?: boolean;
   baseDir?: string;
   foldersFile?: string;
-  remotePath?: string;
-  remotePrefix?: string;
-  adDomain?: string;
+  host?: string;
+  volume?: string;
+  domain?: string;
   truncateLength?: number;
   refresh?: boolean;
   apiUrl?: string;
@@ -86,9 +86,9 @@ const resolveCredentials = async (
   baseRemotePath?: string,
 ): Promise<Credentials> => {
   const keychainCreds = getCredentialsFromKeychain(options.debug || false, osInfo);
-  let { username, password, adDomain } = keychainCreds;
+  let { username, password, domain } = keychainCreds;
 
-  adDomain = adDomain || options.adDomain;
+  domain = domain || options.domain;
   if (!username && password) {
     username = os.userInfo().username;
     if (options.debug)
@@ -102,7 +102,7 @@ const resolveCredentials = async (
     if (isWindowsShareAccessible(baseRemotePath, options.debug || false)) {
       if (options.debug)
         signale.debug('Share reachable with current Windows credentials; skipping credential prompt.');
-      return { username, password, adDomain };
+      return { username, password, domain };
     }
   }
 
@@ -115,12 +115,12 @@ const resolveCredentials = async (
       return {
         username: provided.username,
         password: provided.password,
-        adDomain: provided.adDomain || adDomain,
+        domain: provided.domain || domain,
       };
     }
   }
 
-  return { username, password, adDomain };
+  return { username, password, domain };
 };
 
 
@@ -128,7 +128,7 @@ const resolveCredentials = async (
  * Normalize a configured remote into a platform-appropriate base path. Accepts a
  * bare host ("rstore.qut.edu.au"), an `smb://` URL, or a `\\` UNC path and
  * formats it for the current OS: `smb://host` on nix, `\\host` on Windows. This
- * lets a single `remotePath` value be shared across platforms.
+ * lets a single `host` value be shared across platforms.
  */
 export const formatRemoteBase = (value: string, osInfo: OsInfo): string => {
   const bare = value
@@ -148,7 +148,7 @@ const readRemoteServer = (osInfo: OsInfo): string | undefined => {
   try {
     const parsed = JSON.parse(fs.readFileSync('config.json', 'utf8'));
     const raw =
-      parsed.remotePath || (osInfo.isWindows ? parsed.remotePathWin : parsed.remotePathNix);
+      parsed.host || (osInfo.isWindows ? parsed.hostWin : parsed.hostNix);
     if (!raw) return undefined;
     return formatRemoteBase(raw, osInfo)
       .replace(/^smb:\/\//, '')
@@ -165,8 +165,8 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     debug = false,
     baseDir = BASE_DIR,
     foldersFile = 'folders.json',
-    remotePath,
-    remotePrefix,
+    host,
+    volume,
     truncateLength = 40,
     refresh: doRefresh = false,
     apiUrl,
@@ -270,17 +270,17 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
 
     // Priority: explicit option / config.json > REMOTE_PATH env vars (CI/testing only)
     const envPath = osInfo.isWindows ? process.env.REMOTE_PATH_WIN : process.env.REMOTE_PATH_NIX;
-    const rawRemotePath = remotePath || envPath;
+    const rawRemotePath = host || envPath;
     if (!rawRemotePath) {
       throw new Error(
-        'No remote path configured. Set "remotePath" (or "remotePathNix" / "remotePathWin") in config.json, or use --remote-path.',
+        'No remote host configured. Set "host" (or "hostNix" / "hostWin") in config.json, or use --host.',
       );
     }
     const baseRemotePath = formatRemoteBase(rawRemotePath, osInfo);
 
     // The share/subpath to mount, shared across platforms (e.g. "Projects").
     const prefix =
-      remotePrefix ||
+      volume ||
       (osInfo.isWindows ? process.env.REMOTE_PREFIX_WIN : process.env.REMOTE_PREFIX_NIX);
 
     credentials = undefined;
@@ -410,8 +410,8 @@ program
   .option('--debug', 'Enable debug logging')
   .option('-b, --base-dir <path>', 'Custom base folder location (default: ~/Desktop/RDSS Folders)')
   .option('-f, --folders <path>', 'Custom folders JSON file location (default: folders.json)')
-  .option('-r, --remote-path <path>', 'Custom remote path')
-  .option('--remote-prefix <path>', 'Subpath/share within the remote path to mount (nix only)')
+  .option('-r, --host <host>', 'Custom remote host')
+  .option('--volume <volume>', 'Share/volume within the host to mount (nix only)')
   .option('-t, --truncate <number>', 'Truncate length for folder names', (val) => parseInt(val, 10))
   .option('--refresh', 'Force login and fetch plans from DMP even if folders.json exists')
   .option('--force', 'Ignore existing token in keychain and force a new login')
@@ -424,13 +424,12 @@ program
         // Credentials must come from the keychain only, never from config.json
         delete parsed.username;
         delete parsed.password;
-        delete parsed.domain;
-        // Resolve platform-specific remote path from config.json when present
-        if (!parsed.remotePath) {
-          parsed.remotePath = osInfo.isWindows ? parsed.remotePathWin : parsed.remotePathNix;
+        // Resolve platform-specific remote host from config.json when present
+        if (!parsed.host) {
+          parsed.host = osInfo.isWindows ? parsed.hostWin : parsed.hostNix;
         }
-        if (!parsed.remotePrefix) {
-          parsed.remotePrefix = osInfo.isWindows ? parsed.remotePrefixWin : parsed.remotePrefixNix;
+        if (!parsed.volume) {
+          parsed.volume = osInfo.isWindows ? parsed.volumeWin : parsed.volumeNix;
         }
         configOptions = parsed;
       } catch (e) {
@@ -442,9 +441,9 @@ program
       debug: options.debug ?? configOptions.debug,
       baseDir: options.baseDir ?? configOptions.baseDir,
       foldersFile: options.folders ?? configOptions.foldersFile,
-      remotePath: options.remotePath ?? configOptions.remotePath,
-      remotePrefix: options.remotePrefix ?? configOptions.remotePrefix,
-      adDomain: configOptions.adDomain,
+      host: options.host ?? configOptions.host,
+      volume: options.volume ?? configOptions.volume,
+      domain: configOptions.domain,
       truncateLength: options.truncate ?? configOptions.truncateLength,
       refresh: options.refresh,
       apiUrl: configOptions.apiUrl,
@@ -499,7 +498,7 @@ program
       const server = readRemoteServer(osInfo);
       if (!server) {
         signale.error(
-          'Could not determine the SMB server from config.json. Set "remotePath" (or "remotePathNix").',
+          'Could not determine the SMB server from config.json. Set "host" (or "hostNix").',
         );
         process.exitCode = 1;
         return;
@@ -510,8 +509,8 @@ program
     }
 
     const domainInput = readlineSync.question('Enter AD domain (optional): ');
-    const adDomain = domainInput.trim() || undefined;
-    saveCredentialsToKeychain({ username, password, adDomain }, debug, osInfo);
+    const domain = domainInput.trim() || undefined;
+    saveCredentialsToKeychain({ username, password, domain }, debug, osInfo);
     signale.success('Successfully updated credentials in keychain.');
   });
 

@@ -25,13 +25,13 @@ interface WorkerConfig {
   debug: boolean;
   baseDir: string;
   foldersFile?: string;
-  remotePath?: string;
-  remotePrefix?: string;
+  host?: string;
+  volume?: string;
   apiUrl?: string;
   clientId?: string;
   authDomain?: string;
   callbackUrls?: string[];
-  adDomain?: string;
+  domain?: string;
   username?: string;
   password?: string;
 }
@@ -56,13 +56,13 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
         debug: config.debug,
         baseDir: config.baseDir,
         foldersFile: config.foldersFile,
-        remotePath: config.remotePath,
-        remotePrefix: config.remotePrefix,
+        host: config.host,
+        volume: config.volume,
         apiUrl: config.apiUrl,
         clientId: config.clientId,
         authDomain: config.authDomain,
         callbackUrls: config.callbackUrls,
-        adDomain: config.adDomain,
+        domain: config.domain,
         refresh: true,
         onProgress: (current: number, total: number, folderName: string) => {
           send({ type: 'progress', current, total, folderName });
@@ -83,15 +83,15 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
       // macOS stores the SMB password as a native Internet password keyed by
       // server, so derive the server to clear the right keychain item.
       const server =
-        osInfo.isMac && config.remotePath
-          ? formatRemoteBase(config.remotePath, osInfo)
+        osInfo.isMac && config.host
+          ? formatRemoteBase(config.host, osInfo)
               .replace(/^smb:\/\//, '')
               .replace(/\/.*$/, '')
           : undefined;
       clearCredentialsFromKeychain(config.debug, osInfo, server);
     } else if (type === 'save-credentials') {
       saveCredentialsToKeychain(
-        { username: config.username, password: config.password, adDomain: config.adDomain },
+        { username: config.username, password: config.password, domain: config.domain },
         config.debug,
         getOs(),
       );
