@@ -8,6 +8,10 @@ import { BASE_DIR, formatRemoteBase, getMacInternetPasswordAccount, getOs } from
 let mainWindow: BrowserWindow | null = null;
 let activeWorker: import('worker_threads').Worker | null = null;
 let cancelRequested = false;
+// OAuth token cached in the main process for the app session. Each refresh runs
+// in a short-lived worker thread, so the token is held here (in memory only,
+// never persisted) and passed into every worker to avoid re-logging in.
+let cachedToken: string | undefined;
 const logLines: string[] = [];
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -163,16 +167,19 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
       baseDir: config.baseDir,
       host: deployRemotePath,
       volume: deployRemotePrefix,
+      token: cachedToken,
       foldersFile: path.join(app.getPath('userData'), 'folders.json'),
     };
 
     const worker = new Worker(path.join(__dirname, 'worker.js'));
     activeWorker = worker;
 
-    worker.on('message', (msg: { type: string; line?: string; current?: number; total?: number; folderName?: string; success?: boolean; event?: object }) => {
+    worker.on('message', (msg: { type: string; line?: string; current?: number; total?: number; folderName?: string; success?: boolean; event?: object; token?: string }) => {
       if (msg.type === 'log') {
         logLines.push(msg.line ?? '');
         mainWindow?.webContents.send('log', msg.line);
+      } else if (msg.type === 'token') {
+        cachedToken = msg.token;
       } else if (msg.type === 'progress') {
         mainWindow?.webContents.send('progress', {
           current: msg.current,
@@ -320,6 +327,7 @@ ipcMain.handle('remove-mappings', async () => {
 });
 
 ipcMain.handle('clear-auth', async () => {
+  cachedToken = undefined;
   return runInWorker('clear-auth', loadConfig());
 });
 
