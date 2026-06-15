@@ -130,6 +130,22 @@ const createWindow = () => {
   mainWindow.setMenuBarVisibility(false);
 };
 
+/**
+ * Bring the app window back to the foreground — used after the OAuth browser
+ * tab hands control back to the app, so the user doesn't have to manually
+ * switch back to it. Briefly toggles always-on-top to reliably steal focus
+ * across platforms, and uses app.focus({ steal: true }) for macOS.
+ */
+const focusMainWindow = () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.setAlwaysOnTop(true);
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.setAlwaysOnTop(false);
+  app.focus({ steal: true });
+};
+
 app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
@@ -194,6 +210,11 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
           folderName: msg.folderName,
         });
       } else if (msg.type === 'event') {
+        // The OAuth browser tab takes focus during login; once auth completes
+        // and control returns to the app, pull the window back to the front.
+        if ((msg.event as { type?: string })?.type === 'auth:complete') {
+          focusMainWindow();
+        }
         mainWindow?.webContents.send('event', msg.event);
       } else if (msg.type === 'credentials-required') {
         // On macOS the username is stored on the SMB Internet password; prefer it
