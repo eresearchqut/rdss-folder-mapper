@@ -53,6 +53,7 @@ export type RefreshEvent =
   | { type: 'auth:start' }
   | { type: 'auth:browser-opened'; url: string }
   | { type: 'auth:complete' }
+  | { type: 'profile:fetching' }
   | { type: 'plans:fetching' }
   | { type: 'plans:fetched'; count: number }
   | { type: 'mount:start'; total: number }
@@ -61,6 +62,33 @@ export type RefreshEvent =
 // DMP_BASE_URL kept for backward-compat export; no longer used internally.
 export const DMP_BASE_URL = process.env.DMP_BASE_URL;
 export const BASE_DIR = path.join(os.homedir(), 'Desktop', 'RDSS Folders');
+
+/** Default timeout (ms) for DMP API requests, guarding against an unresponsive server. */
+export const API_TIMEOUT_MS = 30_000;
+
+/**
+ * fetch() with an abort-based timeout. Rejects with a clear, actionable error
+ * when the server does not respond within `timeoutMs`, so the app reports the
+ * stall instead of hanging indefinitely.
+ */
+export const fetchWithTimeout = async (
+  url: string,
+  init: RequestInit = {},
+  timeoutMs: number = API_TIMEOUT_MS,
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`Request to ${url} timed out after ${timeoutMs / 1000}s.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 
 interface RefreshOptions {
@@ -224,7 +252,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         throw new Error('Failed to retrieve access token during login.');
       }
 
-      options.onEvent?.({ type: 'plans:fetching' });
+      options.onEvent?.({ type: 'profile:fetching' });
 
       const authHeaders = {
         Authorization: `Bearer ${token}`,
@@ -237,7 +265,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       try {
         const researcherUrl = `${apiUrl}/researcher`;
         if (debug) signale.debug(`Fetching researcher profile from ${researcherUrl}...`);
-        const researcherResponse = await fetch(researcherUrl, { headers: authHeaders });
+        const researcherResponse = await fetchWithTimeout(researcherUrl, { headers: authHeaders });
         if (researcherResponse.ok) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const researcherData = await researcherResponse.json() as any;
@@ -257,8 +285,9 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       }
 
       const planUrl = `${apiUrl}/plan?includeArchived=true`;
+      options.onEvent?.({ type: 'plans:fetching' });
       if (debug) signale.debug(`Fetching plans from ${planUrl}...`);
-      const response = await fetch(planUrl, { headers: authHeaders });
+      const response = await fetchWithTimeout(planUrl, { headers: authHeaders });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch plans: ${response.status} ${await response.text()}`);

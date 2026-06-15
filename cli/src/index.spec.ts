@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import os from 'os';
 import path from 'path';
-import { BASE_DIR, formatRemoteBase, trimSlashes } from './index';
+import { BASE_DIR, fetchWithTimeout, formatRemoteBase, trimSlashes } from './index';
 import { getOs } from './os';
 
 const macOs = () => ({ ...getOs(), isMac: true, isWindows: false, isLinux: false });
@@ -64,5 +64,40 @@ describe('trimSlashes', () => {
   it('returns an empty string when the input is only separators', () => {
     expect(trimSlashes('///')).toBe('');
     expect(trimSlashes('')).toBe('');
+  });
+});
+
+describe('fetchWithTimeout', () => {
+  it('resolves with the response when fetch completes in time', async () => {
+    const res = { ok: true } as Response;
+    const fetchMock = vi.fn().mockResolvedValue(res);
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(fetchWithTimeout('https://example.test/api', {}, 1000)).resolves.toBe(res);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('rejects with a timeout error when the request exceeds the timeout', async () => {
+    const fetchMock = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          (init.signal as AbortSignal).addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(fetchWithTimeout('https://example.test/slow', {}, 10)).rejects.toThrow(
+        /timed out after/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
