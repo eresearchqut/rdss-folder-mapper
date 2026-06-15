@@ -25,7 +25,8 @@ const isTokenValid = (token: string): boolean => {
   try {
     const payloadBase64 = token.split('.')[1];
     if (!payloadBase64) return false;
-    const payload = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
+    // JWT payloads are base64url-encoded (using -/_), not standard base64.
+    const payload = JSON.parse(Buffer.from(payloadBase64, 'base64url').toString('utf8'));
     return !payload.exp || payload.exp * 1000 > Date.now();
   } catch {
     return false;

@@ -306,3 +306,17 @@ describe('redactHeaders – C6: Authorization header redaction', () => {
     expect(headers['Authorization']).toBe('Bearer real-token');
   });
 });
+
+// ─── Regression: JWT payloads are base64url-encoded ──────────────────────────
+
+describe('getCachedToken – base64url payload decoding', () => {
+  afterEach(() => setCachedToken(undefined));
+
+  it('treats a token whose payload contains base64url chars (-/_) as valid', () => {
+    // Payload {"exp":9999999999,"n":"xx¾"} base64url-encoded contains a '-';
+    // decoding it as standard base64 would mis-parse and force re-auth.
+    const token = 'header.eyJleHAiOjk5OTk5OTk5OTksIm4iOiJ4eMK-In0.signature';
+    setCachedToken(token);
+    expect(getCachedToken()).toBe(token);
+  });
+});

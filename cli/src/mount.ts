@@ -315,10 +315,12 @@ export const buildLinuxCifsMount = (
 ): { url: string; opts: string; logOpts: string } => {
   const { username, password, domain } = credentials || {};
   const url = remotePath.startsWith('smb://') ? remotePath.replace('smb://', '//') : remotePath;
-  const opts =
-    username && password ? `username=${username},password=${password},domain=${domain}` : 'guest';
-  const logOpts =
-    username && password ? `username=${username},password=***,domain=${domain}` : 'guest';
+  // Only include domain= when a domain is actually configured; otherwise mount
+  // -t cifs would receive the literal "domain=undefined" and may reject auth.
+  const credOpts = (pw: string) =>
+    `username=${username},password=${pw}${domain ? `,domain=${domain}` : ''}`;
+  const opts = username && password ? credOpts(password) : 'guest';
+  const logOpts = username && password ? credOpts('***') : 'guest';
   return { url, opts, logOpts };
 };
 

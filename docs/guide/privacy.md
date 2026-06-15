@@ -69,7 +69,7 @@ Credentials stored in the OS keychain are:
 
 To remove everything this app has stored:
 
-1. Open **Settings** and click **Clear Key Chain** — this removes any saved network storage credentials from your keychain. The button appears only when there is something stored to clear.
+1. Open **Settings** and click **Clear Key Chain** — this removes the credentials this app saved itself: on macOS the SMB Internet password for the configured server, and on Linux the `secret-tool` entry (`service rdss-folder-mapper`). The button appears only when there is something stored to clear. Credentials that macOS Finder or Linux GVfs (`gio mount`) saved on your behalf are managed by the OS — remove those from your keychain/keyring manager directly (see below).
 2. Your OAuth session token is never written to the keychain, so there is nothing to remove — it is discarded automatically when the app closes.
 
 To verify or manually remove entries, open your OS credential store:
