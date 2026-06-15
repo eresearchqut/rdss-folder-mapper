@@ -444,6 +444,15 @@ describe('mount.ts unit tests', () => {
       expect(opts).toBe('username=user,password=s3cr3t,domain=qutad');
       expect(logOpts).toBe('username=user,password=***,domain=qutad');
     });
+
+    it('omits domain= when no domain is configured', () => {
+      const { opts, logOpts } = buildLinuxCifsMount('smb://host/projects', {
+        username: 'user',
+        password: 's3cr3t',
+      });
+      expect(opts).toBe('username=user,password=s3cr3t');
+      expect(logOpts).toBe('username=user,password=***');
+    });
   });
 
   describe('findExistingSmbMount', () => {
