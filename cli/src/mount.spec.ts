@@ -484,6 +484,11 @@ describe('mount.ts unit tests', () => {
       expect(calls).toHaveLength(1);
       // First (and only) attempt must NOT contain embedded credentials.
       expect(calls[0][1]).toEqual(['smb://host/projects', '/base/.mounts/projects']);
+      // It must run detached (so it cannot hang on an interactive /dev/tty
+      // password prompt) with a timeout safety net.
+      const probeOpts = calls[0][2] as { detached?: boolean; timeout?: number };
+      expect(probeOpts.detached).toBe(true);
+      expect(probeOpts.timeout).toBeGreaterThan(0);
     });
 
     it('macOS: falls back to credentialed mount when the credential-free attempt fails', () => {

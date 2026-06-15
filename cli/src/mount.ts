@@ -383,11 +383,17 @@ export const mountNixShare = (options: NixShareMountOptions): void => {
   }
 
   if (osInfo.isMac) {
+    // Run mount_smbfs detached from the controlling terminal so it can never
+    // block on an interactive /dev/tty password prompt (stdio alone does not
+    // cover /dev/tty). A timeout is a further safety net for the credential-free
+    // probe: if no reusable session/keychain entry exists we fail fast and fall
+    // back to an explicit, non-interactive credentialed mount.
+    const baseOpts = { stdio: debug ? 'pipe' : 'ignore', detached: true } as const;
     const { url: plainUrl } = buildMacSmbUrl(remotePath);
     try {
       if (debug)
         signale.debug(`Executing: mount_smbfs "${plainUrl}" "${mountPath}" (reuse session/keychain)`);
-      execFileSync('mount_smbfs', [plainUrl, mountPath], { stdio: debug ? 'pipe' : 'ignore' });
+      execFileSync('mount_smbfs', [plainUrl, mountPath], { ...baseOpts, timeout: 15000 });
       return;
     } catch (e) {
       if (debug)
@@ -397,7 +403,7 @@ export const mountNixShare = (options: NixShareMountOptions): void => {
     }
     const { url, logUrl } = buildMacSmbUrl(remotePath, credentials);
     if (debug) signale.debug(`Executing: mount_smbfs "${logUrl}" "${mountPath}"`);
-    execFileSync('mount_smbfs', [url, mountPath], { stdio: debug ? 'pipe' : 'ignore' });
+    execFileSync('mount_smbfs', [url, mountPath], baseOpts);
     return;
   }
 
