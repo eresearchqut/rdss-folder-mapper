@@ -53,6 +53,7 @@ export type RefreshEvent =
   | { type: 'auth:start' }
   | { type: 'auth:browser-opened'; url: string }
   | { type: 'auth:complete' }
+  | { type: 'profile:fetching' }
   | { type: 'plans:fetching' }
   | { type: 'plans:fetched'; count: number }
   | { type: 'mount:start'; total: number }
@@ -224,7 +225,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         throw new Error('Failed to retrieve access token during login.');
       }
 
-      options.onEvent?.({ type: 'plans:fetching' });
+      options.onEvent?.({ type: 'profile:fetching' });
 
       const authHeaders = {
         Authorization: `Bearer ${token}`,
@@ -257,6 +258,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       }
 
       const planUrl = `${apiUrl}/plan?includeArchived=true`;
+      options.onEvent?.({ type: 'plans:fetching' });
       if (debug) signale.debug(`Fetching plans from ${planUrl}...`);
       const response = await fetch(planUrl, { headers: authHeaders });
 
