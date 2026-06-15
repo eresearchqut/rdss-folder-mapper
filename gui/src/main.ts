@@ -34,11 +34,7 @@ interface DeploymentConfig {
   callbackUrls?: string[];
   domain?: string;
   host?: string;
-  hostNix?: string;
-  hostWin?: string;
   volume?: string;
-  volumeNix?: string;
-  volumeWin?: string;
 }
 
 const configPath = () => path.join(app.getPath('userData'), 'config.json');
@@ -154,8 +150,7 @@ app.on('window-all-closed', () => {
  */
 const deploymentServer = (): string | undefined => {
   const deployConfig = loadDeploymentConfig();
-  const isWin = process.platform === 'win32';
-  const host = deployConfig.host ?? (isWin ? deployConfig.hostWin : deployConfig.hostNix);
+  const host = deployConfig.host;
   if (!host) return undefined;
   return formatRemoteBase(host, getOs())
     .replace(/^smb:\/\//, '')
@@ -170,11 +165,8 @@ const deploymentServer = (): string | undefined => {
 const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): Promise<{ success: boolean; cancelled: boolean }> =>
   new Promise((resolve) => {
     const deployConfig = loadDeploymentConfig();
-    const osInfo = process.platform === 'win32';
-    const deployRemotePath = deployConfig.host
-      ?? (osInfo ? deployConfig.hostWin : deployConfig.hostNix);
-    const deployRemotePrefix = deployConfig.volume
-      ?? (osInfo ? deployConfig.volumeWin : deployConfig.volumeNix);
+    const deployRemotePath = deployConfig.host;
+    const deployRemotePrefix = deployConfig.volume;
 
     const workerConfig = {
       ...deployConfig,

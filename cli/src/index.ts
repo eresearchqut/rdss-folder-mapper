@@ -162,8 +162,7 @@ const readRemoteServer = (osInfo: OsInfo): string | undefined => {
   if (!fs.existsSync('config.json')) return undefined;
   try {
     const parsed = JSON.parse(fs.readFileSync('config.json', 'utf8'));
-    const raw =
-      parsed.host || (osInfo.isWindows ? parsed.hostWin : parsed.hostNix);
+    const raw = parsed.host;
     if (!raw) return undefined;
     return formatRemoteBase(raw, osInfo)
       .replace(/^smb:\/\//, '')
@@ -288,7 +287,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     const rawRemotePath = host || envPath;
     if (!rawRemotePath) {
       throw new Error(
-        'No remote host configured. Set "host" (or "hostNix" / "hostWin") in config.json, or use --host.',
+        'No remote host configured. Set "host" in config.json, or use --host.',
       );
     }
     const baseRemotePath = formatRemoteBase(rawRemotePath, osInfo);
@@ -444,7 +443,6 @@ program
   .option('--refresh', 'Force login and fetch plans from DMP even if folders.json exists')
   .option('--force', 'Ignore existing token in keychain and force a new login')
   .action(async (options) => {
-    const osInfo = getOs();
     let configOptions: Partial<RefreshOptions> = {};
     if (fs.existsSync('config.json')) {
       try {
@@ -452,13 +450,6 @@ program
         // Credentials must come from the keychain only, never from config.json
         delete parsed.username;
         delete parsed.password;
-        // Resolve platform-specific remote host from config.json when present
-        if (!parsed.host) {
-          parsed.host = osInfo.isWindows ? parsed.hostWin : parsed.hostNix;
-        }
-        if (!parsed.volume) {
-          parsed.volume = osInfo.isWindows ? parsed.volumeWin : parsed.volumeNix;
-        }
         configOptions = parsed;
       } catch (e) {
         signale.error('Warning: Failed to parse config.json', (e as Error).message);
@@ -526,7 +517,7 @@ program
       const server = readRemoteServer(osInfo);
       if (!server) {
         signale.error(
-          'Could not determine the SMB server from config.json. Set "host" (or "hostNix").',
+          'Could not determine the SMB server from config.json. Set "host".',
         );
         process.exitCode = 1;
         return;

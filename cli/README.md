@@ -162,8 +162,7 @@ The remote server is configured with `host` (a bare host, e.g.
 `rstore.example.edu`) plus a `volume` (the share/subpath, e.g. `Projects`).
 The CLI formats `host` per platform automatically — `smb://host` on
 macOS/Linux and `\\host` on Windows — so a single value works everywhere. (You
-can still override per platform with `hostNix` / `hostWin` and
-`volumeNix` / `volumeWin`, or with `--host` / `--volume`.)
+can override at runtime with `--host` / `--volume`.)
 
 - **macOS / Linux**: the share `host/prefix` is mounted **once**, and each
   folder `id` is aliased from `<baseDir>/<Name [id]>` to `<mount>/<id>`. This
