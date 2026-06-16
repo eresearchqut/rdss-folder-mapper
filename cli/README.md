@@ -6,9 +6,13 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 
 - **Windows**: Windows 10/11
 - **macOS**: macOS 10.15+ (requires SMB client, usually built-in)
-- **Linux**: GVfs (`gio`, usually pre-installed on GNOME/KDE desktops) is used
-  by default; on hosts without it, `cifs-utils` is required for the
-  `sudo mount -t cifs` fallback.
+- **Linux**: the share is mounted using whichever of these is available, in order:
+  1. **GVfs** (`gio`, pre-installed on GNOME/Cinnamon/XFCE) — no `sudo`, integrates
+     with the desktop keyring.
+  2. **rclone** (`rclone`) — a userspace FUSE mount that works on desktops without
+     GVfs (KDE, plain window managers). No `sudo`; requires FUSE (`fuse`/`fuse3`).
+  3. **`sudo mount -t cifs`** (requires `cifs-utils`) — last-resort kernel mount,
+     e.g. on headless hosts.
 
 ## Download
 
@@ -126,9 +130,11 @@ How SMB credentials are handled depends on the platform:
   username is read back from that keychain item on subsequent runs.
 - **Linux**: when mounting through GVfs (`gio`, the default on desktop Linux),
   credentials are handled by the desktop and stored in the GNOME keyring, so
-  `auth` is not required. On hosts without GVfs the CLI falls back to a
-  `sudo mount -t cifs` mount, for which `auth` stores the
-  username/password/domain via `secret-tool` (Secret Service).
+  `auth` is not required. On desktops without GVfs the CLI mounts via `rclone`
+  (FUSE) or, as a last resort, `sudo mount -t cifs`; for both of these `auth`
+  stores the username/password/domain via `secret-tool` (Secret Service). The
+  password is passed to `rclone` pre-obscured (`rclone obscure`) so it never
+  appears in clear text in the process list.
 - **Windows**: the RDSS share is accessed with your logged-in session identity,
   so there is nothing to store — `auth` and `clear-auth` are informational.
 
@@ -170,9 +176,11 @@ can override at runtime with `--host` / `--volume`.)
   Finder/NetFS (`osascript`), so macOS handles authentication and offers to save
   the password in your keychain for silent reuse. On **Linux** the share is
   mounted via GVfs (`gio mount`) into your user session — no `sudo`, with the
-  desktop prompting once and storing the password in the GNOME keyring; if GVfs
-  is unavailable the CLI falls back to `sudo mount -t cifs` at
-  `<baseDir>/.mounts/<prefix>` using credentials from `secret-tool` (or a prompt).
+  desktop prompting once and storing the password in the GNOME keyring. On
+  desktops without GVfs the CLI mounts the share as a userspace FUSE mount via
+  `rclone` (no `sudo`, read+write as your user) at `<baseDir>/.mounts/<prefix>`;
+  if neither is available it falls back to `sudo mount -t cifs` at the same path.
+  The FUSE/CIFS paths use credentials from `secret-tool` (or a prompt).
 - **Windows**: each folder is mapped individually at `\\host\prefix\<id>`.
 
 ## Remote Configuration & OAuth Login
