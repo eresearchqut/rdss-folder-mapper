@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, screen, nativeImage } from 'electron';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -185,6 +185,13 @@ const focusMainWindow = () => {
 };
 
 app.whenReady().then(() => {
+  // On macOS the Dock icon is the Electron default during development (the
+  // packaged .app uses the bundled .icns). Set it explicitly so dev runs show
+  // the real icon too. BrowserWindow.icon is ignored for the Dock on macOS.
+  if (process.platform === 'darwin' && app.dock) {
+    const dockIcon = nativeImage.createFromPath(path.join(__dirname, 'icon.png'));
+    if (!dockIcon.isEmpty()) app.dock.setIcon(dockIcon);
+  }
   createWindow();
 });
 
