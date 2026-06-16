@@ -152,7 +152,7 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
           if (parsedUrl.pathname === expectedPath) {
             const code = parsedUrl.searchParams.get('code');
             if (code) {
-              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.writeHead(200, { 'Content-Type': 'text/html', 'Connection': 'close' });
               res.end(`<html>
 <head>
   <style>
@@ -209,7 +209,14 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
                   setCachedToken(tokenData.id_token);
                   signale.success('Successfully logged in.');
                   onEvent?.({ type: 'auth:complete' });
-                  server.close(() => resolve(tokenData.id_token));
+                  // Resolve immediately rather than waiting for server.close()'s
+                  // callback: the browser keeps the success page's socket alive
+                  // (its window.close() often can't close the tab), which would
+                  // otherwise stall the token — and the profile fetch — until that
+                  // keep-alive connection idles out. Force lingering sockets shut.
+                  resolve(tokenData.id_token);
+                  server.closeAllConnections?.();
+                  server.close();
                   return;
                 } else {
                   signale.error('No id_token found in response.');
