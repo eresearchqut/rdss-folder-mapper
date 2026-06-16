@@ -474,6 +474,103 @@ export const mountLinuxViaGio = (smbUrl: string, debug = false): void => {
 };
 
 /**
+ * Obscure a plaintext password with `rclone obscure` so it can be embedded in an
+ * rclone connection string without appearing in clear text in the process table.
+ * rclone refuses plaintext passwords in connection strings, so this is required.
+ */
+export const obscureRclonePassword = (password: string): string =>
+  execFileSync('rclone', ['obscure', password], { encoding: 'utf8' }).trim();
+
+/**
+ * Build the `rclone mount` argument vector for an SMB share using an inline
+ * `:smb,...:share` connection string. Returns the args plus a redacted copy for
+ * logging. The password must already be obscured (see obscureRclonePassword).
+ */
+export const buildRcloneSmbMount = (
+  server: string,
+  share: string,
+  mountPath: string,
+  obscuredPassword?: string,
+  credentials?: Credentials,
+): { args: string[]; logArgs: string[] } => {
+  const { username, domain } = credentials || {};
+  const portMatch = server.match(/:(\d+)$/);
+  const host = server.replace(/:\d+$/, '');
+  const baseParts = [`host=${host}`];
+  if (portMatch) baseParts.push(`port=${portMatch[1]}`);
+  if (username) baseParts.push(`user=${username}`);
+  if (domain) baseParts.push(`domain=${domain}`);
+  const buildArgs = (pw?: string): string[] => {
+    const parts = [...baseParts];
+    if (pw) parts.push(`pass=${pw}`);
+    const connStr = `:smb,${parts.join(',')}:${share}`;
+    // --daemon waits until the FUSE mount is ready before backgrounding rclone.
+    // --vfs-cache-mode writes gives normal read+write semantics owned by the user.
+    return ['mount', connStr, mountPath, '--vfs-cache-mode', 'writes', '--daemon'];
+  };
+  return {
+    args: buildArgs(obscuredPassword),
+    logArgs: buildArgs(obscuredPassword ? '***' : undefined),
+  };
+};
+
+export interface RcloneMountOptions {
+  server: string;
+  share: string;
+  mountPath: string;
+  credentials?: Credentials;
+  debug?: boolean;
+}
+
+/**
+ * Cross-desktop fallback to GVfs: mount an SMB share as a userspace FUSE mount
+ * via `rclone mount`. Unlike `gio`/GVfs this has no GNOME dependency, so it works
+ * on KDE and bare window managers. The mount is owned by the invoking user
+ * (read+write, no sudo). Torn down with `fusermount -u` (see unmountLinux).
+ */
+export const mountLinuxViaRclone = (options: RcloneMountOptions): void => {
+  const { server, share, mountPath, credentials, debug = false } = options;
+  if (!fs.existsSync(mountPath)) {
+    fs.mkdirSync(mountPath, { recursive: true });
+  }
+  const obscured = credentials?.password
+    ? obscureRclonePassword(credentials.password)
+    : undefined;
+  const { args, logArgs } = buildRcloneSmbMount(
+    server,
+    share,
+    mountPath,
+    obscured,
+    credentials,
+  );
+  if (debug) signale.debug(`Executing: rclone ${logArgs.join(' ')}`);
+  execFileSync('rclone', args, { stdio: debug ? 'pipe' : 'ignore' });
+};
+
+/**
+ * Unmount a Linux mount point. Userspace FUSE mounts (rclone/smbnetfs) must be
+ * released with `fusermount -u` rather than `umount`, and need no sudo; kernel
+ * CIFS mounts fall back to `sudo umount`.
+ */
+export const unmountLinux = (mountPath: string, debug = false): void => {
+  const fuser = isCommandAvailable('fusermount3') ? 'fusermount3' : 'fusermount';
+  if (isCommandAvailable(fuser)) {
+    try {
+      if (debug) signale.debug(`Executing: ${fuser} -u "${mountPath}"`);
+      execFileSync(fuser, ['-u', mountPath], { stdio: debug ? 'pipe' : 'ignore' });
+      return;
+    } catch (e) {
+      if (debug)
+        signale.debug(
+          `${fuser} -u failed, falling back to sudo umount: ${(e as Error).message}`,
+        );
+    }
+  }
+  if (debug) signale.debug(`Executing: sudo umount "${mountPath}"`);
+  execFileSync('sudo', ['umount', mountPath], { stdio: debug ? 'pipe' : 'ignore' });
+};
+
+/**
  * Locate an active GVfs SMB mount for the given server/share. GVfs mounts do not
  * appear as //server/share in the `mount` table (they surface as a single
  * gvfsd-fuse entry), so they are found by inspecting the per-user gvfs directory,
@@ -694,7 +791,7 @@ export const resetMountsDir = (mountsDir: string, debug: boolean, osInfo: OsInfo
         if (osInfo.isMac) {
           execFileSync('umount', [mountPath], { stdio: debug ? 'pipe' : 'ignore' });
         } else {
-          execFileSync('sudo', ['umount', mountPath], { stdio: debug ? 'pipe' : 'ignore' });
+          unmountLinux(mountPath, debug);
         }
         fs.rmdirSync(mountPath);
       } catch (error: unknown) {
@@ -722,7 +819,7 @@ export const removeMapping = (localPath: string, debug: boolean, osInfo: OsInfo)
         if (osInfo.isMac) {
           execFileSync('umount', [localPath], { stdio: debug ? 'pipe' : 'ignore' });
         } else {
-          execFileSync('sudo', ['umount', localPath], { stdio: debug ? 'pipe' : 'ignore' });
+          unmountLinux(localPath, debug);
         }
         fs.rmdirSync(localPath);
       }

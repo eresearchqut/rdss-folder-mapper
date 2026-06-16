@@ -35,6 +35,7 @@ import {
   mountNixShare,
   mountMacViaFinder,
   mountLinuxViaGio,
+  mountLinuxViaRclone,
   findGvfsMount,
   isCommandAvailable,
   aliasSubfolder,
@@ -410,6 +411,36 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
             signale.error(`Could not locate the mounted share for ${sharePath} after mounting.`);
             options.onEvent?.({ type: 'mount:complete' });
             return;
+          }
+        } else if (isCommandAvailable('rclone')) {
+          // Cross-desktop fallback for systems without GVfs (KDE, bare window
+          // managers): mount as a userspace FUSE mount via rclone. Owned by the
+          // user (read+write, no sudo) and unmounted with fusermount -u.
+          baseMountPath = path.join(mountsDir, mountDirName);
+          if (!isMounted(baseMountPath, baseMountPath, osInfo)) {
+            signale.info(`Mounting share ${sharePath} via rclone (FUSE)`);
+            credentials = await resolveCredentials(options, osInfo, baseRemotePath);
+            try {
+              mountLinuxViaRclone({
+                server,
+                share,
+                mountPath: baseMountPath,
+                credentials,
+                debug,
+              });
+            } catch (error: unknown) {
+              handleMountError(
+                error,
+                sharePath,
+                baseMountPath,
+                baseMountPath,
+                credentials?.password,
+                debug,
+                osInfo,
+              );
+              options.onEvent?.({ type: 'mount:complete' });
+              return;
+            }
           }
         } else {
           // Fallback: mount the share once with credentials from secret-tool (or a prompt).

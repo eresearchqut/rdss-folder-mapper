@@ -17,6 +17,10 @@ import {
   findExistingSmbMount,
   mountNixShare,
   mountLinuxViaGio,
+  mountLinuxViaRclone,
+  buildRcloneSmbMount,
+  obscureRclonePassword,
+  unmountLinux,
   findGvfsMount,
   isCommandAvailable,
   aliasSubfolder,
@@ -511,6 +515,113 @@ describe('mount.ts unit tests', () => {
         'gio',
         ['mount', 'smb://rstore.qut.edu.au/projects'],
         { stdio: 'inherit' },
+      );
+    });
+  });
+
+  describe('buildRcloneSmbMount', () => {
+    it('builds a :smb connection string with host, user and obscured pass', () => {
+      const { args } = buildRcloneSmbMount(
+        'rstore.qut.edu.au',
+        'projects',
+        '/mounts/projects',
+        'OBSCURED',
+        { username: 'jdoe', domain: 'qutad' },
+      );
+      expect(args[0]).toBe('mount');
+      expect(args[1]).toBe(':smb,host=rstore.qut.edu.au,user=jdoe,domain=qutad,pass=OBSCURED:projects');
+      expect(args[2]).toBe('/mounts/projects');
+      expect(args).toContain('--daemon');
+      expect(args).toContain('--vfs-cache-mode');
+      expect(args).toContain('writes');
+    });
+
+    it('encodes a host:port server into a separate port field', () => {
+      const { args } = buildRcloneSmbMount('host:4455', 'share', '/m', undefined, {});
+      expect(args[1]).toBe(':smb,host=host,port=4455:share');
+    });
+
+    it('redacts the password in logArgs', () => {
+      const { logArgs } = buildRcloneSmbMount('h', 'share', '/m', 'SECRET', {
+        username: 'u',
+      });
+      expect(logArgs.join(' ')).toContain('pass=***');
+      expect(logArgs.join(' ')).not.toContain('SECRET');
+    });
+  });
+
+  describe('obscureRclonePassword', () => {
+    it('shells out to `rclone obscure` and trims the result', () => {
+      vi.mocked(child_process.execFileSync).mockReturnValue('obfuscated\n' as any);
+      expect(obscureRclonePassword('s3cret')).toBe('obfuscated');
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+        'rclone',
+        ['obscure', 's3cret'],
+        { encoding: 'utf8' },
+      );
+    });
+  });
+
+  describe('mountLinuxViaRclone', () => {
+    it('obscures the password and never passes plaintext to `rclone mount`', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(child_process.execFileSync).mockImplementation(((cmd: string, a: string[]) => {
+        if (cmd === 'rclone' && a[0] === 'obscure') return 'OBS\n' as any;
+        return undefined as any;
+      }) as any);
+
+      mountLinuxViaRclone({
+        server: 'rstore.qut.edu.au',
+        share: 'projects',
+        mountPath: '/mounts/projects',
+        credentials: { username: 'jdoe', password: 'p@ss word' },
+      });
+
+      const mountCall = vi
+        .mocked(child_process.execFileSync)
+        .mock.calls.find((c) => c[0] === 'rclone' && (c[1] as string[])[0] === 'mount');
+      expect(mountCall).toBeDefined();
+      const connStr = (mountCall![1] as string[])[1];
+      expect(connStr).toContain('pass=OBS');
+      expect(connStr).not.toContain('p@ss word');
+    });
+  });
+
+  describe('unmountLinux', () => {
+    const originalPath = process.env.PATH;
+    afterEach(() => {
+      process.env.PATH = originalPath;
+    });
+
+    it('uses fusermount -u when available (no sudo)', () => {
+      process.env.PATH = '/usr/bin';
+      vi.mocked(fs.accessSync).mockImplementation((p) => {
+        if (String(p).endsWith('/fusermount')) return;
+        throw new Error('not found');
+      });
+      unmountLinux('/mounts/projects');
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+        'fusermount',
+        ['-u', '/mounts/projects'],
+        expect.any(Object),
+      );
+      expect(child_process.execFileSync).not.toHaveBeenCalledWith(
+        'sudo',
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('falls back to sudo umount when no fusermount is on PATH', () => {
+      process.env.PATH = '/usr/bin';
+      vi.mocked(fs.accessSync).mockImplementation(() => {
+        throw new Error('not found');
+      });
+      unmountLinux('/mounts/projects');
+      expect(child_process.execFileSync).toHaveBeenCalledWith(
+        'sudo',
+        ['umount', '/mounts/projects'],
+        expect.any(Object),
       );
     });
   });
