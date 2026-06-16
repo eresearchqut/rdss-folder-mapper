@@ -5,7 +5,7 @@ A cross-platform command-line interface (CLI) tool that allows you to create loc
 ## Requirements
 
 - **Windows**: Windows 10/11
-- **macOS**: macOS 10.15+ (requires SMB client, usually built-in)
+- **macOS**: macOS 11+ (requires SMB client, usually built-in)
 - **Linux**: the share is mounted using whichever of these is available, in order:
   1. **GVfs** (`gio`, pre-installed on GNOME/Cinnamon/XFCE) — no `sudo`, integrates
      with the desktop keyring.

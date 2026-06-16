@@ -21,8 +21,8 @@ A monorepo containing the CLI tool and desktop GUI for mapping RDSS research sto
 ## Requirements
 
 - **Windows**: Windows 10/11
-- **macOS**: macOS 10.15+ (SMB client built-in)
-- **Linux**: GVfs (`gio`) by default; `cifs-utils` for the non-GVfs fallback
+- **macOS**: macOS 11+ (SMB client built-in)
+- **Linux**: GVfs (`gio`) by default; `rclone` (FUSE) or `cifs-utils` for the non-GVfs fallback
 
 ## Quick Start — GUI (Recommended for researchers)
 
@@ -62,7 +62,7 @@ Download binaries directly:
 
 ```bash
 npm install                        # install all workspace dependencies
-npm run build                      # build CLI
+npm run build                      # build CLI + GUI
 npm run test                       # run CLI tests
 npm run start:gui                  # build CLI + launch GUI (development)
 npm run build --workspace=cli      # build CLI only
