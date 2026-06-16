@@ -43,16 +43,7 @@
 
     .topbar-brand { display: flex; align-items: center; gap: 10px; }
 
-    .qut-badge {
-      background: var(--qut-white);
-      color: var(--qut-navy);
-      font-size: 11px; font-weight: 900;
-      letter-spacing: 0.5px;
-      padding: 3px 7px;
-      border-radius: 3px;
-      line-height: 1;
-      flex-shrink: 0;
-    }
+    .brand-icon { width: 30px; height: 30px; display: block; flex-shrink: 0; }
 
     h1 {
       font-size: 15px; font-weight: 600;
@@ -308,7 +299,29 @@
 
   <div class="topbar">
     <div class="topbar-brand">
-      <span class="qut-badge">QUT</span>
+      <svg class="brand-icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-label="RDSS Folder Mapper">
+        <defs>
+          <linearGradient id="brandTile" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#eef1f7"/>
+            <stop offset="1" stop-color="#d3daeb"/>
+          </linearGradient>
+        </defs>
+        <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#brandTile)"/>
+        <polygon points="256,76 436,166 256,256 76,166" fill="#3457b5"/>
+        <polygon points="76,166 256,256 256,436 76,346" fill="#24449a"/>
+        <polygon points="256,256 436,166 436,346 256,436" fill="#16306f"/>
+        <g transform="matrix(1.8,-0.9,1.8,0.9,76,166)" fill="#eef1f7">
+          <path d="M50 16c-17 0-30 13-30 30 0 21 30 44 30 44s30-23 30-44c0-17-13-30-30-30z"/>
+          <circle cx="50" cy="46" r="11" fill="#3457b5"/>
+        </g>
+        <g transform="matrix(1.8,0.9,0,1.8,76,166)">
+          <path d="M22 33h22l8 9h20a6 6 0 0 1 6 6v22a6 6 0 0 1-6 6H22a6 6 0 0 1-6-6V39a6 6 0 0 1 6-6z" fill="#eef1f7"/>
+          <path d="M22 33h22l8 9H16v-4a6 6 0 0 1 6-6z" fill="#b9c5e6"/>
+        </g>
+        <g transform="matrix(1.8,-0.9,0,1.8,256,256)">
+          <text x="50" y="61" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="800" font-size="33" letter-spacing="-1.5" fill="#eef1f7">RDSS</text>
+        </g>
+      </svg>
       <h1>RDSS Folder Mapper</h1>
     </div>
     <button class="btn-icon" id="btnSettings" title="Settings">⚙</button>
