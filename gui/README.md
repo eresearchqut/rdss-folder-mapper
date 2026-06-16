@@ -11,7 +11,11 @@ A desktop application for university researchers to map RDSS research storage fo
 ## Requirements
 
 - **Node.js 18+**
-- **macOS** or **Linux**: SMB client (built-in on macOS; install `cifs-utils` on Linux)
+- **macOS** or **Linux** — SMB mount backend:
+  - **macOS**: built-in SMB client.
+  - **Linux**: GVfs (`gio`, pre-installed on GNOME/Cinnamon/XFCE) by default; on
+    other desktops install `rclone` for a userspace FUSE mount, or `cifs-utils`
+    for the `sudo mount -t cifs` fallback.
 - **Windows**: PowerShell (built-in on Windows 10/11)
 - The CLI package must be built before starting the GUI (handled automatically by the root `start:gui` script)
 
@@ -44,13 +48,23 @@ gui/
 ├── src/
 │   ├── main.ts        # Electron main process — IPC handlers, calls CLI functions
 │   ├── preload.ts     # Context bridge — exposes safe API to renderer
+│   ├── worker.ts      # Worker thread — runs each map/remove off the main process
 │   └── renderer/
 │       └── index.html # UI — buttons, status bar, activity log
 └── dist/              # Compiled output (git-ignored)
     ├── main.js
-    └── preload.js
+    ├── preload.js
+    └── worker.js
 ```
 
-## Packaging (future)
+## Packaging
 
-Use [Electron Forge](https://www.electronforge.io/) or [electron-builder](https://www.electron.build/) to bundle the app into a standalone installer for distribution.
+The GUI is packaged with [electron-builder](https://www.electron.build/) into
+platform installers (`.dmg`, `.exe`, `.AppImage`). Build for the current OS with:
+
+```bash
+npm run dist --workspace=gui
+```
+
+Releases are produced automatically by the `release` GitHub workflow when a
+version tag is pushed.

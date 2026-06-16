@@ -11,14 +11,14 @@ The main window has three sections:
 | Section | Description |
 |---------|-------------|
 | **Status bar** | Shows the current state (Ready, Mapping, Error). |
-| **Map Research Folders** | Fetches your approved project list and creates folder shortcuts on your Desktop. |
-| **Remove Mappings** | Removes all previously created folder shortcuts. |
+| **Connect Research Folders** | Fetches your approved project list and creates folder shortcuts on your Desktop. |
+| **Remove Shortcuts** | Removes all previously created folder shortcuts. |
 
 At the bottom, the **Activity log** toggle reveals a detailed log of every action the tool performs. This is useful for troubleshooting.
 
 ## Mapping your folders
 
-1. Click **Map Research Folders**.
+1. Click **Connect Research Folders**.
 2. A progress bar appears, showing each folder as it is mapped.
 3. When complete, the bar turns green and the status changes to **Folders mapped**.
 

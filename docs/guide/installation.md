@@ -53,12 +53,6 @@ curl -fsSL https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/mai
 irm https://raw.githubusercontent.com/eresearchqut/rdss-folder-mapper/main/download.ps1 | iex
 ```
 
-### npm (any platform)
-
-```bash
-npm install -g rdss-folder-mapper
-```
-
 ---
 
 ## Requirements
