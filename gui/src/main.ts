@@ -156,6 +156,7 @@ const createWindow = () => {
     height: 650,
     resizable: false,
     title: 'RDSS Folder Mapper',
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
