@@ -185,13 +185,12 @@ const focusMainWindow = () => {
 
 app.whenReady().then(() => {
   createWindow();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
 });
 
+// Quit when the window is closed on every platform (including macOS, which would
+// otherwise keep the app running in the background after the window closes).
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  app.quit();
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
