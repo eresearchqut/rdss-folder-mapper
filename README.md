@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./gui/build/icon.png" alt="RDSS Folder Mapper" width="120" height="120">
+</p>
+
 # RDSS Folder Mapper
 
 > 📖 **[Full documentation → eresearchqut.github.io/rdss-folder-mapper](https://eresearchqut.github.io/rdss-folder-mapper/)**

@@ -6,8 +6,8 @@ hero:
   text: "Your research folders, ready on your Desktop"
   tagline: Mount your RDSS folders as regular desktop folders with easy to read names.
   image:
-    src: /screenshots/gui-main.png
-    alt: RDSS Folder Mapper GUI
+    src: /icon.png
+    alt: RDSS Folder Mapper
   actions:
     - theme: brand
       text: Get Started
