@@ -4,6 +4,7 @@ import { execSync, execFileSync } from 'child_process';
 import { startCase } from 'lodash';
 import truncate from '@stdlib/string-truncate';
 import signale from 'signale';
+import { createConnection, Socket } from 'net';
 
 import { FolderMapping } from './mapper';
 import { OS, OsInfo } from './os';
@@ -19,6 +20,63 @@ const winSys32 = process.env.SystemRoot
   : 'C:\\Windows\\System32';
 const psExe = `${winSys32}\\WindowsPowerShell\\v1.0\\powershell.exe`;
 const netExe = `${winSys32}\\net.exe`;
+
+/**
+ * Test whether the given SMB host is reachable by attempting a quick TCP
+ * connection to port 445 (SMB) with a 3-second timeout. Returns true if the
+ * host responds, false if unreachable or timeout expires.
+ *
+ * Use this before starting folder mapping to provide early feedback when the
+ * user is not connected to the network/VPN.
+ */
+export const isHostReachable = async (
+  host: string,
+  timeoutMs = 3000,
+  debug = false,
+): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const socket: Socket = createConnection({ host, port: 445, timeout: timeoutMs });
+
+    const cleanup = () => {
+      socket.removeAllListeners();
+      socket.destroy();
+    };
+
+    socket.on('connect', () => {
+      if (debug) signale.debug(`Host ${host} is reachable (SMB port 445 responded).`);
+      cleanup();
+      resolve(true);
+    });
+
+    socket.on('timeout', () => {
+      if (debug) signale.debug(`Host ${host} timed out after ${timeoutMs}ms.`);
+      cleanup();
+      resolve(false);
+    });
+
+    socket.on('error', (err) => {
+      if (debug) signale.debug(`Host ${host} is not reachable: ${err.message}`);
+      cleanup();
+      resolve(false);
+    });
+  });
+};
+
+/**
+ * Extract the hostname from various SMB path formats:
+ * - smb://host.example.com/share → host.example.com
+ * - \\host.example.com\share → host.example.com  
+ * - host.example.com → host.example.com
+ */
+export const extractHostname = (remotePath: string): string => {
+  // Remove smb:// prefix
+  let cleaned = remotePath.replace(/^smb:\/\//i, '');
+  // Remove \\ prefix (Windows UNC)
+  cleaned = cleaned.replace(/^\\\\/, '');
+  // Take everything before the first / or \
+  const parts = cleaned.split(/[/\\]/);
+  return parts[0] || cleaned;
+};
 
 /**
  * Check whether a Windows network share is reachable using the current Windows
