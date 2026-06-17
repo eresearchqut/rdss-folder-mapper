@@ -60,7 +60,7 @@ const loadConfig = (): Config => {
   for (const candidate of [settingsPath(), legacySettingsPath()]) {
     try {
       const raw = fs.readFileSync(candidate, 'utf8');
-      return { ...defaultConfig(), ...JSON.parse(raw) };
+      return { ...defaultConfig(), ...JSON.parse(raw.replace(/^\uFEFF/, '')) };
     } catch { /* try next candidate */ }
   }
   return defaultConfig();
@@ -84,7 +84,10 @@ const systemDeploymentConfigPath = (): string => {
 };
 
 const parseDeploymentJson = (raw: string): DeploymentConfig => {
-  const parsed = JSON.parse(raw);
+  // Strip a leading UTF-8 BOM: Windows PowerShell 5.1 `Set-Content -Encoding UTF8`
+  // prepends one, which JSON.parse rejects. Without this a BOM'd config silently
+  // resolves to {} even though the file exists.
+  const parsed = JSON.parse(raw.replace(/^\uFEFF/, ''));
   // Only user credentials are forbidden in config; the AD `domain` (e.g. "qutad")
   // is a legitimate, non-secret deployment setting and must be preserved so the
   // credentials dialog can skip prompting for it.
