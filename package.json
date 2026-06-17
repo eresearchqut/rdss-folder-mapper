@@ -20,5 +20,5 @@
     "puppeteer": "^25.1.0",
     "vitepress": "^1.6.4"
   },
-  "version": "1.10.6"
+  "version": "1.10.7"
 }

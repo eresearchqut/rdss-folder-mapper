@@ -7,14 +7,18 @@
   </defs>
   <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgA)"/>
   
-  <!-- RDSS text above -->
-  <text x="256" y="140" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="900" font-size="80" letter-spacing="-3" fill="#eef1f7">RDSS</text>
+  <!-- RDSS text - scaled up (80 → 110), moved down -->
+  <text x="256" y="175" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="900" font-size="110" letter-spacing="-3" fill="#eef1f7">RDSS</text>
   
-  <!-- Folder moved up -->
-  <path d="M90 170h100l36 40h190a28 28 0 0 1 28 28v160a28 28 0 0 1-28 28H90a28 28 0 0 1-28-28V198a28 28 0 0 1 28-28z" fill="#eef1f7"/>
-  <path d="M90 170h100l36 40H62v-12a28 28 0 0 1 28-28z" fill="#d3daeb"/>
+  <!-- Folder - scaled down (0.75x) and repositioned -->
+  <g transform="translate(256, 310) scale(0.75)">
+    <path d="M-166 -120h100l36 40h190a28 28 0 0 1 28 28v160a28 28 0 0 1-28 28h-326a28 28 0 0 1-28-28v-200a28 28 0 0 1 28-28z" fill="#eef1f7"/>
+    <path d="M-166 -120h100l36 40h-164v-12a28 28 0 0 1 28-28z" fill="#d3daeb"/>
+  </g>
   
-  <!-- Pin positioned inside the folder -->
-  <path d="M256 235c-35 0-63 28-63 63 0 45 63 103 63 103s63-58 63-103c0-35-28-63-63-63z" fill="#24449a"/>
-  <circle cx="256" cy="298" r="25" fill="#eef1f7"/>
+  <!-- Pin - scaled down (0.75x) -->
+  <g transform="translate(256, 310) scale(0.75)">
+    <path d="M0 -65c-35 0-63 28-63 63 0 45 63 103 63 103s63-58 63-103c0-35-28-63-63-63z" fill="#24449a"/>
+    <circle cx="0" cy="-2" r="25" fill="#eef1f7"/>
+  </g>
 </svg>
