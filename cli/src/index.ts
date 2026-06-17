@@ -40,12 +40,14 @@ import {
   isCommandAvailable,
   aliasSubfolder,
   handleMountError,
+  isHostReachable,
+  extractHostname,
 } from './mount';
 
 // Export for tests and GUI
 export { transformPlansToFolders, performLogin, getCachedToken, setCachedToken };
 export type { AuthEvent } from './auth';
-export { reset } from './mount';
+export { reset, isHostReachable, extractHostname } from './mount';
 export { getOs } from './os';
 export { clearCredentialsFromKeychain, getCredentialsFromKeychain, saveCredentialsToKeychain, getMacInternetPasswordAccount } from './secrets';
 export type { Credentials } from './secrets';
@@ -238,6 +240,21 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
       }
       if (!apiUrl) {
         throw new Error('apiUrl is not configured. Set "apiUrl" in config.json.');
+      }
+
+      // Pre-flight connectivity check: test if the SMB host is reachable before
+      // starting authentication. If the user is not on the network/VPN, this
+      // provides early feedback without attempting slow/hanging SMB operations.
+      if (host) {
+        const hostname = extractHostname(host);
+        signale.info(`Checking connectivity to ${hostname}...`);
+        const reachable = await isHostReachable(hostname, 3000, debug);
+        if (!reachable) {
+          throw new Error(
+            `Cannot reach storage host "${hostname}". Please ensure you are connected to the QUT network or VPN and try again.`,
+          );
+        }
+        signale.success(`Host ${hostname} is reachable.`);
       }
 
       options.onEvent?.({ type: 'auth:start' });
