@@ -251,7 +251,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         const reachable = await isHostReachable(hostname, 3000, debug);
         if (!reachable) {
           throw new Error(
-            `Cannot reach storage host "${hostname}". Please ensure you are connected to the QUT network or VPN and try again.`,
+            `Can't reach ${hostname}. You need to be on the QUT network or VPN.`,
           );
         }
         signale.success(`Host ${hostname} is reachable.`);
