@@ -37,15 +37,33 @@ interface DeploymentConfig {
   volume?: string;
 }
 
-const configPath = () => path.join(app.getPath('userData'), 'config.json');
+// User settings live in settings.json (debug toggle + base dir). This is named
+// distinctly from the deployment config.json so the two never get confused.
+const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+
+// Legacy location: earlier versions stored user settings as config.json in the
+// same directory, which collided by name with the deployment config.json.
+const legacySettingsPath = () => path.join(app.getPath('userData'), 'config.json');
+
+/**
+ * One-time migration: rename the legacy user-settings config.json to
+ * settings.json. Runs on startup; a no-op once migrated or for fresh installs.
+ */
+const migrateLegacySettings = (): void => {
+  try {
+    if (fs.existsSync(settingsPath()) || !fs.existsSync(legacySettingsPath())) return;
+    fs.renameSync(legacySettingsPath(), settingsPath());
+  } catch { /* ignore migration failures; loadConfig still falls back to legacy */ }
+};
 
 const loadConfig = (): Config => {
-  try {
-    const raw = fs.readFileSync(configPath(), 'utf8');
-    return { ...defaultConfig(), ...JSON.parse(raw) };
-  } catch {
-    return defaultConfig();
+  for (const candidate of [settingsPath(), legacySettingsPath()]) {
+    try {
+      const raw = fs.readFileSync(candidate, 'utf8');
+      return { ...defaultConfig(), ...JSON.parse(raw) };
+    } catch { /* try next candidate */ }
   }
+  return defaultConfig();
 };
 
 /**
@@ -127,7 +145,7 @@ interface ConfigSource {
 const getConfigSources = (): ConfigSource[] => {
   const sources: ConfigSource[] = [];
 
-  const userPath = configPath();
+  const userPath = settingsPath();
   sources.push({ label: 'User settings', path: userPath, loaded: fs.existsSync(userPath) });
 
   const sysPath = systemDeploymentConfigPath();
@@ -145,7 +163,7 @@ const getConfigSources = (): ConfigSource[] => {
 };
 
 const saveConfig = (config: Config): void => {
-  fs.writeFileSync(configPath(), JSON.stringify(config, null, 2));
+  fs.writeFileSync(settingsPath(), JSON.stringify(config, null, 2));
 };
 
 // ─── Window ───────────────────────────────────────────────────────────────────
@@ -185,6 +203,7 @@ const focusMainWindow = () => {
 };
 
 app.whenReady().then(() => {
+  migrateLegacySettings();
   // On macOS the Dock icon is the Electron default during development (the
   // packaged .app uses the bundled .icns). Set it explicitly so dev runs show
   // the real icon too. BrowserWindow.icon is ignored for the Dock on macOS.
