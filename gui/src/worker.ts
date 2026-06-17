@@ -107,7 +107,7 @@ parentPort?.on('message', async (msg: { type: string; config?: WorkerConfig; cre
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     send({ type: 'log', line: `✗ ${msg}` });
-    send({ type: 'done', success: false });
+    send({ type: 'done', success: false, error: msg });
   } finally {
     process.exitCode = prevExitCode;
   }

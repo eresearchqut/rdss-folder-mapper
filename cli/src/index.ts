@@ -504,6 +504,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
     process.exitCode = 1;
     const msg = sanitizeErrorMessage(error, credentials?.password);
     signale.error('Error during refresh:', msg);
+    throw error; // Re-throw so GUI worker can capture the error message
   }
 };
 
