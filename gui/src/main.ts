@@ -250,7 +250,7 @@ const appendLog = (line: string) => {
  * process event loop (and therefore the renderer) stays responsive during
  * blocking mount syscalls.
  */
-const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): Promise<{ success: boolean; cancelled: boolean }> =>
+const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): Promise<{ success: boolean; cancelled: boolean; error?: string }> =>
   new Promise((resolve) => {
     const deployConfig = loadDeploymentConfig();
     const deployRemotePath = deployConfig.host;
@@ -278,7 +278,7 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
     const worker = new Worker(path.join(__dirname, 'worker.js'));
     activeWorker = worker;
 
-    worker.on('message', (msg: { type: string; line?: string; current?: number; total?: number; folderName?: string; success?: boolean; event?: object; token?: string }) => {
+    worker.on('message', (msg: { type: string; line?: string; current?: number; total?: number; folderName?: string; success?: boolean; error?: string; event?: object; token?: string }) => {
       if (msg.type === 'log') {
         logLines.push(msg.line ?? '');
         mainWindow?.webContents.send('log', msg.line);
@@ -315,7 +315,7 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
         });
       } else if (msg.type === 'done') {
         activeWorker = null;
-        resolve({ success: msg.success ?? false, cancelled: false });
+        resolve({ success: msg.success ?? false, cancelled: false, error: msg.error });
         worker.terminate();
       }
     });
@@ -323,12 +323,12 @@ const runInWorker = (type: 'refresh' | 'reset' | 'clear-auth', config: Config): 
     worker.on('error', (err: Error) => {
       activeWorker = null;
       mainWindow?.webContents.send('log', `✗ ${err.message}`);
-      resolve({ success: false, cancelled: cancelRequested });
+      resolve({ success: false, cancelled: cancelRequested, error: err.message });
     });
 
     worker.on('exit', () => {
       activeWorker = null;
-      resolve({ success: false, cancelled: cancelRequested });
+      resolve({ success: false, cancelled: cancelRequested, error: 'Operation was interrupted' });
     });
 
     worker.postMessage({ type, config: workerConfig });
@@ -455,8 +455,9 @@ ipcMain.handle('map-folders', async () => {
   cancelRequested = false;
   const cfg = loadConfig();
   if (!(await ensureBaseDirAccess(cfg.baseDir))) {
-    mainWindow?.webContents.send('log', `✗ Access to ${cfg.baseDir} was denied. Please grant permission in System Settings → Privacy & Security → Files and Folders.`);
-    return { success: false, cancelled: false };
+    const errorMsg = `Access to ${cfg.baseDir} was denied. Please grant permission in System Settings → Privacy & Security → Files and Folders.`;
+    mainWindow?.webContents.send('log', `✗ ${errorMsg}`);
+    return { success: false, cancelled: false, error: errorMsg };
   }
   return runInWorker('refresh', cfg);
 });

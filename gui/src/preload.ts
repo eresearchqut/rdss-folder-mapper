@@ -35,9 +35,9 @@ contextBridge.exposeInMainWorld('api', {
 
   cancelOperation: (): Promise<void> => ipcRenderer.invoke('cancel-operation'),
 
-  mapFolders: (): Promise<{ success: boolean; cancelled: boolean }> => ipcRenderer.invoke('map-folders'),
+  mapFolders: (): Promise<{ success: boolean; cancelled: boolean; error?: string }> => ipcRenderer.invoke('map-folders'),
 
-  removeMappings: (): Promise<{ success: boolean }> => ipcRenderer.invoke('remove-mappings'),
+  removeMappings: (): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('remove-mappings'),
 
   clearAuth: (): Promise<{ success: boolean }> => ipcRenderer.invoke('clear-auth'),
 
