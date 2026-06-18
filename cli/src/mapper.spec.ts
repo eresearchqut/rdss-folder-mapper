@@ -122,4 +122,46 @@ describe('transformPlansToFolders', () => {
       expect(result.folders[0].role).toBe('LEAD');
     });
   });
+
+  describe('archived plan filtering', () => {
+    it('excludes plans where status is ARCHIVED', () => {
+      const plan = {
+        dataStorageId: 'storage-3',
+        encodedId: 'ARCH001',
+        status: 'ARCHIVED',
+        project: { title: 'Archived Project' },
+        projectMeta: { isLead: true, isCollaborator: false, isSupervisor: false },
+      };
+      const result = transformPlansToFolders([plan]);
+      expect(result.folders).toHaveLength(0);
+    });
+
+    it('calls onExcluded with the plan title and reason for archived plans', () => {
+      const excluded: { title: string | undefined; reason: string }[] = [];
+      transformPlansToFolders(
+        [{
+          dataStorageId: 'storage-3',
+          encodedId: 'ARCH001',
+          status: 'ARCHIVED',
+          project: { title: 'Archived Project' },
+          projectMeta: { isLead: true, isCollaborator: false, isSupervisor: false },
+        }],
+        undefined,
+        (title, reason) => excluded.push({ title, reason }),
+      );
+      expect(excluded).toEqual([{ title: 'Archived Project', reason: 'archived plan' }]);
+    });
+
+    it('includes non-archived plans', () => {
+      const plan = {
+        dataStorageId: 'storage-3',
+        encodedId: 'ACTIVE001',
+        status: 'ACTIVE',
+        project: { title: 'Active Project' },
+        projectMeta: { isLead: true, isCollaborator: false, isSupervisor: false },
+      };
+      const result = transformPlansToFolders([plan]);
+      expect(result.folders).toHaveLength(1);
+    });
+  });
 });

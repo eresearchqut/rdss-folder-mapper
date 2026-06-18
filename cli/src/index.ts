@@ -302,7 +302,7 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         signale.warn(`Researcher profile fetch failed; collaborator read-only filter will be skipped. ${sanitizeErrorMessage(err)}`);
       }
 
-      const planUrl = `${apiUrl}/plan?includeArchived=true`;
+      const planUrl = `${apiUrl}/plan?includeArchived=false`;
       options.onEvent?.({ type: 'plans:fetching' });
       if (debug) signale.debug(`Fetching plans from ${planUrl}...`);
       const response = await fetchWithTimeout(planUrl, { headers: authHeaders });

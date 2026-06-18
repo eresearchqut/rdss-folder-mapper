@@ -15,6 +15,7 @@ export interface Collaborator {
 export interface Plan {
   dataStorageId?: string;
   encodedId: string;
+  status?: string;
   project?: {
     title?: string;
     collaborators?: Collaborator[];
@@ -38,6 +39,13 @@ export const transformPlansToFolders = (
   onIncluded?: (title: string | undefined, reason: string) => void,
 ): { folders: FolderMapping[] } => {
   const folders = plans
+    .filter((plan: Plan) => {
+      if (plan.status === 'ARCHIVED') {
+        onExcluded?.(plan.project?.title, 'archived plan');
+        return false;
+      }
+      return true;
+    })
     .filter((plan: Plan) => !!plan.dataStorageId)
     .filter((plan: Plan) => {
       const meta = plan.projectMeta;
