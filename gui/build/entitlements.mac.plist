@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Electron requires JIT and writable/executable memory under the hardened runtime. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <!-- Electron loads its own (separately signed) frameworks/helpers. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <!-- Outgoing connections for OAuth login and SMB mounting. -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <!-- Local loopback OAuth callback server (127.0.0.1) started during login. -->
+  <key>com.apple.security.network.server</key>
+  <true/>
+</dict>
+</plist>

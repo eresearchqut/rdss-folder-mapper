@@ -36,7 +36,9 @@ jobs:
         include:
           - os: macos-latest
             name: macos
-            artifact: "gui/release/*.dmg"
+            artifact: |
+              gui/release/*.dmg
+              gui/release/*.pkg
           - os: windows-latest
             name: windows
             artifact: "gui/release/*.exe"
@@ -45,6 +47,11 @@ jobs:
             artifact: "gui/release/*.AppImage"
 
     runs-on: ${{ matrix.os }}
+
+    env:
+      # Surfaced so step-level `if` can gate on secret presence without
+      # referencing the secrets context directly in conditionals.
+      HAS_MAC_SIGNING: ${{ secrets.MAC_CERT_APP_P12 != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +66,45 @@ jobs:
       - name: Build CLI (required by GUI bundle)
         run: npm run build:ts --workspace=cli
 
+      # Import the Developer ID Application (signs the .app/.dmg) and Developer
+      # ID Installer (signs the .pkg) certificates into a temporary keychain so
+      # electron-builder can auto-discover both identities. Skipped when the
+      # signing secrets are absent (forks / PRs), producing unsigned builds.
+      - name: Import Apple signing certificates
+        if: matrix.os == 'macos-latest' && env.HAS_MAC_SIGNING == 'true'
+        env:
+          MAC_CERT_APP_P12: ${{ secrets.MAC_CERT_APP_P12 }}
+          MAC_CERT_INSTALLER_P12: ${{ secrets.MAC_CERT_INSTALLER_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$MAC_CERT_APP_P12" | base64 --decode > "$RUNNER_TEMP/app.p12"
+          security import "$RUNNER_TEMP/app.p12" -P "$MAC_CERT_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+
+          if [ -n "$MAC_CERT_INSTALLER_P12" ]; then
+            echo "$MAC_CERT_INSTALLER_P12" | base64 --decode > "$RUNNER_TEMP/installer.p12"
+            security import "$RUNNER_TEMP/installer.p12" -P "$MAC_CERT_PASSWORD" \
+              -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          fi
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
+          rm -f "$RUNNER_TEMP/app.p12" "$RUNNER_TEMP/installer.p12"
+
       - name: Package GUI
+        env:
+          # Used by build/notarize.js (afterSign hook). Empty on non-mac /
+          # secret-less runs, which makes notarization skip gracefully.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run dist --workspace=gui
 
       - name: Upload GUI artifact

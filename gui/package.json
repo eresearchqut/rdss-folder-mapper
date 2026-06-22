@@ -1,6 +1,6 @@
 {
   "name": "rdss-folder-mapper-gui",
-  "version": "1.11.3",
+  "version": "1.12.0",
   "private": true,
   "description": "Desktop GUI for RDSS Folder Mapper — map your research storage folders to your Desktop with a single click.",
   "main": "dist/main.js",
@@ -11,6 +11,7 @@
     "dist": "npm run build && electron-builder"
   },
   "devDependencies": {
+    "@electron/notarize": "^3.1.0",
     "@types/node": "^25.9.3",
     "electron": "42.4.0",
     "electron-builder": "^26.15.3",
@@ -23,6 +24,7 @@
     "productName": "RDSS Folder Mapper",
     "artifactName": "rdss-folder-mapper-gui-${os}.${ext}",
     "compression": "normal",
+    "afterSign": "build/notarize.js",
     "directories": {
       "output": "release"
     },
@@ -36,9 +38,20 @@
     "publish": null,
     "mac": {
       "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "pkg",
           "arch": [
             "x64",
             "arm64"
@@ -49,6 +62,14 @@
       "extendInfo": {
         "NSDesktopFolderUsageDescription": "RDSS Folder Mapper needs access to your Desktop folder to create and manage research storage shortcuts."
       }
+    },
+    "pkg": {
+      "installLocation": "/Applications",
+      "isRelocatable": false,
+      "allowAnywhere": false,
+      "allowCurrentUserHome": false,
+      "allowRootDirectory": true,
+      "overwriteAction": "upgrade"
     },
     "win": {
       "icon": "build/icon.ico",

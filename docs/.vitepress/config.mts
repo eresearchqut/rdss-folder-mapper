@@ -33,6 +33,12 @@ export default defineConfig({
           { text: 'Your Data & Privacy', link: '/guide/privacy' },
         ],
       },
+      {
+        text: 'For IT Administrators',
+        items: [
+          { text: 'Deployment', link: '/guide/deployment' },
+        ],
+      },
     ],
 
     socialLinks: [
