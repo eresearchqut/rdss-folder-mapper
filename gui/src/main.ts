@@ -174,7 +174,7 @@ const saveConfig = (config: Config): void => {
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 520,
-    height: 650,
+    height: 700,
     resizable: false,
     title: 'RDSS Folder Mapper',
     icon: path.join(__dirname, 'icon.png'),
@@ -349,7 +349,10 @@ ipcMain.handle('resize-content-height', (_event, contentHeight: number) => {
   if (!mainWindow || typeof contentHeight !== 'number' || !Number.isFinite(contentHeight)) return;
   const [width] = mainWindow.getContentSize();
   const workAreaHeight = screen.getDisplayMatching(mainWindow.getBounds()).workArea.height;
-  const height = Math.round(Math.min(Math.max(contentHeight, 360), workAreaHeight - 40));
+  // Floor of 440 keeps the window tall enough for the summary modal (a fixed
+  // overlay ~400px tall) to display without its top/bottom edges clipping, even
+  // when the main panel's natural content is shorter.
+  const height = Math.round(Math.min(Math.max(contentHeight, 440), workAreaHeight - 40));
   if (mainWindow.getContentSize()[1] === height) return;
   // The window is non-user-resizable; macOS ignores programmatic resizes while
   // resizable is false, so toggle it just for this call. Width stays fixed.

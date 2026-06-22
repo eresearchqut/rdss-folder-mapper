@@ -47,6 +47,7 @@ import {
 // Export for tests and GUI
 export { transformPlansToFolders, performLogin, getCachedToken, setCachedToken };
 export type { AuthEvent } from './auth';
+export type { PlanSummaryEntry } from './mapper';
 export { reset, isHostReachable, extractHostname } from './mount';
 export { getOs } from './os';
 export { clearCredentialsFromKeychain, getCredentialsFromKeychain, saveCredentialsToKeychain, getMacInternetPasswordAccount } from './secrets';
@@ -59,6 +60,7 @@ export type RefreshEvent =
   | { type: 'profile:fetching' }
   | { type: 'plans:fetching' }
   | { type: 'plans:fetched'; count: number }
+  | { type: 'plans:summary'; entries: import('./mapper').PlanSummaryEntry[] }
   | { type: 'mount:start'; total: number }
   | { type: 'mount:complete' };
 
@@ -317,11 +319,12 @@ export const refresh = async (options: RefreshOptions = {}): Promise<void> => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Array.isArray(plansData) ? plansData : (plansData as any).items || [],
         currentResearcherId,
-        (title, reason) => signale.info(`Skipping folder "${title ?? '(untitled)'}" — ${reason}`),
-        (title, reason) => { if (debug) signale.debug(`Including folder "${title ?? '(untitled)'}" — ${reason}`); },
+        (title, reason, id) => signale.info(`Skipping folder "${title ?? '(untitled)'}" [${id}] — ${reason}`),
+        (title, reason, id) => { if (debug) signale.debug(`Including folder "${title ?? '(untitled)'}" [${id}] — ${reason}`); },
       );
 
       options.onEvent?.({ type: 'plans:fetched', count: mappedFolders.folders.length });
+      options.onEvent?.({ type: 'plans:summary', entries: mappedFolders.summary });
       fs.writeFileSync(foldersFile, JSON.stringify(mappedFolders.folders, null, 2), 'utf8');
       signale.success(`Successfully mapped plans and saved to ${foldersFile}`);
     }

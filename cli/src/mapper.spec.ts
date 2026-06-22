@@ -100,14 +100,14 @@ describe('transformPlansToFolders', () => {
       expect(result.folders).toHaveLength(1);
     });
 
-    it('calls onExcluded with the plan title and reason when a read-only collaborator is excluded', () => {
-      const excluded: { title: string | undefined; reason: string }[] = [];
+    it('calls onExcluded with the plan title, reason, and id when a read-only collaborator is excluded', () => {
+      const excluded: { title: string | undefined; reason: string; id: string }[] = [];
       transformPlansToFolders(
         [makeCollaboratorPlan(true, 'Read-only')],
         researcherId,
-        (title, reason) => excluded.push({ title, reason }),
+        (title, reason, id) => excluded.push({ title, reason, id }),
       );
-      expect(excluded).toEqual([{ title: 'Collab Project', reason: 'read-only collaborator' }]);
+      expect(excluded).toEqual([{ title: 'Collab Project', reason: 'read-only collaborator', id: 'COLLAB001' }]);
     });
 
     it('does not affect lead or supervisor plans regardless of collaborator list', () => {
@@ -136,8 +136,8 @@ describe('transformPlansToFolders', () => {
       expect(result.folders).toHaveLength(0);
     });
 
-    it('calls onExcluded with the plan title and reason for archived plans', () => {
-      const excluded: { title: string | undefined; reason: string }[] = [];
+    it('calls onExcluded with the plan title, reason, and id for archived plans', () => {
+      const excluded: { title: string | undefined; reason: string; id: string }[] = [];
       transformPlansToFolders(
         [{
           dataStorageId: 'storage-3',
@@ -147,9 +147,9 @@ describe('transformPlansToFolders', () => {
           projectMeta: { isLead: true, isCollaborator: false, isSupervisor: false },
         }],
         undefined,
-        (title, reason) => excluded.push({ title, reason }),
+        (title, reason, id) => excluded.push({ title, reason, id }),
       );
-      expect(excluded).toEqual([{ title: 'Archived Project', reason: 'archived plan' }]);
+      expect(excluded).toEqual([{ title: 'Archived Project', reason: 'archived plan', id: 'ARCH001' }]);
     });
 
     it('includes non-archived plans', () => {
@@ -162,6 +162,50 @@ describe('transformPlansToFolders', () => {
       };
       const result = transformPlansToFolders([plan]);
       expect(result.folders).toHaveLength(1);
+    });
+  });
+
+  describe('summary', () => {
+    it('returns a summary entry for every plan with mapped status and reason', () => {
+      const researcherId = 'researcher-001';
+      const input = [
+        {
+          dataStorageId: 'storage-1',
+          encodedId: 'LEAD001',
+          project: { title: 'Lead Project' },
+          projectMeta: { isLead: true, isCollaborator: false, isSupervisor: false },
+        },
+        {
+          encodedId: 'NO_STORAGE',
+          project: { title: 'No Storage Project' },
+        },
+        {
+          dataStorageId: 'storage-2',
+          encodedId: 'ARCH001',
+          status: 'ARCHIVED',
+          project: { title: 'Archived Project' },
+          projectMeta: { isLead: true },
+        },
+        {
+          dataStorageId: 'storage-3',
+          encodedId: 'RO001',
+          project: {
+            title: 'Read-only Collab',
+            collaborators: [{ researcher: { id: researcherId }, isReadOnly: true, role: 'Read-only' }],
+          },
+          projectMeta: { isCollaborator: true },
+        },
+      ];
+
+      const { folders, summary } = transformPlansToFolders(input, researcherId);
+
+      expect(folders).toHaveLength(1);
+      expect(summary).toEqual([
+        { id: 'LEAD001', title: 'Lead Project', mapped: true, reason: 'lead' },
+        { id: 'NO_STORAGE', title: 'No Storage Project', mapped: false, reason: 'no data storage' },
+        { id: 'ARCH001', title: 'Archived Project', mapped: false, reason: 'archived plan' },
+        { id: 'RO001', title: 'Read-only Collab', mapped: false, reason: 'read-only collaborator' },
+      ]);
     });
   });
 });

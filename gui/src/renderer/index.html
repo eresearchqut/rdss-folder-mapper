@@ -93,6 +93,8 @@
     }
     .status-log-link:hover { color: #b71c1c; }
     .status-log-link.hidden { display: none; }
+    .status-summary-link { color: var(--qut-blue); }
+    .status-summary-link:hover { color: var(--qut-navy); }
 
     /* ── Progress (inside status card) ── */
     .progress-section {
@@ -235,6 +237,48 @@
     .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
     .modal-actions .btn { margin-bottom: 0; }
 
+    /* ── Summary modal ── */
+    .modal-card.modal-wide { width: 440px; }
+    .summary-table {
+      width: 100%; border-collapse: collapse; font-size: 12px;
+      table-layout: fixed;
+    }
+    .summary-table th, .summary-table td {
+      text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--qut-border);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .summary-table th {
+      color: var(--qut-subtle); font-weight: 600; font-size: 11px;
+      text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .summary-table th.sortable { cursor: pointer; user-select: none; }
+    .summary-table th.sortable:hover { color: var(--qut-blue); }
+    .summary-table th .sort-ind { margin-left: 4px; font-size: 10px; color: var(--qut-blue); }
+    .summary-table td.col-title { font-weight: 600; color: var(--qut-navy); }
+    .summary-table td.col-id { color: #9aa5b2; font-size: 11px; width: 96px; }
+    .summary-table td.col-status { width: 84px; }
+    .status-pill {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600;
+    }
+    .status-pill.mapped { background: #e3f3e6; color: #2e7d32; }
+    .status-pill.skipped { background: #fdeaea; color: #c62828; }
+    .summary-reason { color: var(--qut-subtle); font-size: 11px; }
+    .summary-pager {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 14px;
+    }
+    .summary-pager .page-info { font-size: 11px; color: var(--qut-subtle); }
+    .summary-pager .pager-buttons { display: flex; gap: 8px; }
+    .pager-btn {
+      background: none; border: 1px solid var(--qut-border); border-radius: 6px;
+      cursor: pointer; padding: 4px 10px; font-size: 12px; color: var(--qut-blue);
+      font-weight: 600;
+    }
+    .pager-btn:disabled { color: #c3cad6; cursor: default; border-color: #eef1f7; }
+    .summary-empty { font-size: 12px; color: var(--qut-subtle); padding: 12px 0; }
+    .summary-empty.hidden { display: none; }
+
     .settings-title { font-size: 15px; font-weight: 700; color: var(--qut-navy); margin-bottom: 12px; }
 
     .field { margin-bottom: 10px; }
@@ -348,6 +392,7 @@
         <div class="status-dot" id="statusDot"></div>
         <span class="status-text" id="statusText">Ready</span>
         <button class="status-log-link hidden" id="statusLogLink">Activity log ↗</button>
+        <button class="status-log-link status-summary-link hidden" id="statusSummaryLink">Summary ↗</button>
       </div>
       <div class="progress-section hidden" id="progressSection">
         <div class="progress-header">
@@ -474,6 +519,38 @@
     </div>
   </div>
 
+  <!-- ── Summary modal ── -->
+  <div class="modal-overlay hidden" id="modalSummary">
+    <div class="modal-card modal-wide">
+      <div class="modal-title">Mapping summary</div>
+      <div class="modal-hint">Every plan retrieved for your account, and whether it was mapped or skipped.</div>
+
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th class="col-title sortable" data-sort="title">Plan<span class="sort-ind"></span></th>
+            <th class="col-status sortable" data-sort="status">Status<span class="sort-ind"></span></th>
+            <th class="sortable" data-sort="reason">Reason<span class="sort-ind"></span></th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+      <div class="summary-empty hidden" id="summaryEmpty">No plans were returned for your account.</div>
+
+      <div class="summary-pager">
+        <span class="page-info" id="summaryPageInfo"></span>
+        <div class="pager-buttons">
+          <button class="pager-btn" id="btnSummaryPrev">‹ Prev</button>
+          <button class="pager-btn" id="btnSummaryNext">Next ›</button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="btnSummaryClose" style="flex:1">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const modalCredentials = document.getElementById('modalCredentials');
     const credUsername     = document.getElementById('credUsername');
@@ -523,6 +600,123 @@
 
     window.api.onCredentialsRequired(({ defaultUsername, domainConfigured }) =>
       showCredentialsModal(defaultUsername, domainConfigured));
+
+    // ── Summary modal ──────────────────────────────────────────────────────
+    const statusSummaryLink = document.getElementById('statusSummaryLink');
+    const modalSummary     = document.getElementById('modalSummary');
+    const summaryBody      = document.getElementById('summaryBody');
+    const summaryEmpty     = document.getElementById('summaryEmpty');
+    const summaryPageInfo  = document.getElementById('summaryPageInfo');
+    const btnSummaryPrev   = document.getElementById('btnSummaryPrev');
+    const btnSummaryNext   = document.getElementById('btnSummaryNext');
+    const btnSummaryClose  = document.getElementById('btnSummaryClose');
+
+    const SUMMARY_PAGE_SIZE = 5;
+    let summaryEntries = [];
+    let summaryPage = 0;
+    // Default sort: mapped folders first, then alphabetically by title.
+    let summarySort = { key: 'status', dir: 'asc' };
+
+    const summaryCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+    const summaryTitleOf = e => e.title || '(untitled)';
+    const summaryComparators = {
+      title: (a, b) => summaryCollator.compare(summaryTitleOf(a), summaryTitleOf(b)),
+      status: (a, b) => (a.mapped === b.mapped
+        ? summaryCollator.compare(summaryTitleOf(a), summaryTitleOf(b))
+        : (a.mapped ? -1 : 1)),
+      reason: (a, b) => summaryCollator.compare(a.reason || '', b.reason || '')
+        || summaryCollator.compare(summaryTitleOf(a), summaryTitleOf(b)),
+    };
+
+    const getSortedSummary = () => {
+      const cmp = summaryComparators[summarySort.key] || summaryComparators.status;
+      const dir = summarySort.dir === 'desc' ? -1 : 1;
+      return summaryEntries.slice().sort((a, b) => dir * cmp(a, b));
+    };
+
+    const updateSortIndicators = () => {
+      modalSummary.querySelectorAll('th.sortable').forEach(th => {
+        const ind = th.querySelector('.sort-ind');
+        ind.textContent = th.dataset.sort === summarySort.key
+          ? (summarySort.dir === 'asc' ? '▲' : '▼')
+          : '';
+      });
+    };
+
+    const renderSummaryPage = () => {
+      const sorted = getSortedSummary();
+      const total = sorted.length;
+      const pageCount = Math.max(1, Math.ceil(total / SUMMARY_PAGE_SIZE));
+      summaryPage = Math.min(Math.max(summaryPage, 0), pageCount - 1);
+
+      summaryBody.innerHTML = '';
+      summaryEmpty.classList.toggle('hidden', total > 0);
+      updateSortIndicators();
+
+      const start = summaryPage * SUMMARY_PAGE_SIZE;
+      sorted.slice(start, start + SUMMARY_PAGE_SIZE).forEach(entry => {
+        const tr = document.createElement('tr');
+
+        const titleTd = document.createElement('td');
+        titleTd.className = 'col-title';
+        titleTd.textContent = entry.title || '(untitled)';
+        titleTd.title = entry.title || '(untitled)';
+
+        const statusTd = document.createElement('td');
+        statusTd.className = 'col-status';
+        const pill = document.createElement('span');
+        pill.className = 'status-pill ' + (entry.mapped ? 'mapped' : 'skipped');
+        pill.textContent = entry.mapped ? 'Mapped' : 'Skipped';
+        statusTd.appendChild(pill);
+
+        const reasonTd = document.createElement('td');
+        reasonTd.className = 'summary-reason';
+        // For mapped plans the "reason" is just the matched role; show a dash
+        // so the column reads as the skip reason it's primarily there for.
+        reasonTd.textContent = entry.mapped ? '—' : entry.reason;
+        reasonTd.title = entry.mapped ? entry.id : `${entry.reason} · ${entry.id}`;
+
+        tr.appendChild(titleTd);
+        tr.appendChild(statusTd);
+        tr.appendChild(reasonTd);
+        summaryBody.appendChild(tr);
+      });
+
+      const mappedCount = summaryEntries.filter(e => e.mapped).length;
+      summaryPageInfo.textContent = total > 0
+        ? `${mappedCount} mapped · ${total - mappedCount} skipped — page ${summaryPage + 1} of ${pageCount}`
+        : '';
+      btnSummaryPrev.disabled = summaryPage <= 0;
+      btnSummaryNext.disabled = summaryPage >= pageCount - 1;
+    };
+
+    const openSummaryModal = () => {
+      summarySort = { key: 'status', dir: 'asc' };
+      summaryPage = 0;
+      renderSummaryPage();
+      modalSummary.classList.remove('hidden');
+    };
+
+    const hideSummaryModal = () => modalSummary.classList.add('hidden');
+
+    modalSummary.querySelectorAll('th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (summarySort.key === key) {
+          summarySort.dir = summarySort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          summarySort = { key, dir: 'asc' };
+        }
+        summaryPage = 0;
+        renderSummaryPage();
+      });
+    });
+
+    statusSummaryLink.addEventListener('click', openSummaryModal);
+    btnSummaryClose.addEventListener('click', hideSummaryModal);
+    btnSummaryPrev.addEventListener('click', () => { summaryPage--; renderSummaryPage(); });
+    btnSummaryNext.addEventListener('click', () => { summaryPage++; renderSummaryPage(); });
+    modalSummary.addEventListener('click', e => { if (e.target === modalSummary) hideSummaryModal(); });
 
     const panelMain     = document.getElementById('panelMain');
     const panelSettings = document.getElementById('panelSettings');
@@ -669,6 +863,8 @@
       } else if (event.type === 'plans:fetched') {
         mappedFolderCount = event.count ?? 0;
         showStep('Preparing folders…');
+      } else if (event.type === 'plans:summary') {
+        summaryEntries = Array.isArray(event.entries) ? event.entries : [];
       } else if (event.type === 'mount:start') {
         progressFill.classList.remove('indeterminate');
         progressFill.style.marginLeft = '0';
@@ -859,6 +1055,8 @@
       helpCard.classList.add('hidden');
       hideError();
       mappedFolderCount = null;
+      summaryEntries = [];
+      statusSummaryLink.classList.add('hidden');
       setBusy(true);
       setStatus('Connecting folders…', '#f57c00');
 
@@ -886,6 +1084,11 @@
           showError(result.error);
         }
       }
+      // Reveal the summary link once mapping completed and produced a per-plan
+      // breakdown, so the user can review what was mapped or skipped.
+      if (result.success && summaryEntries.length > 0) {
+        statusSummaryLink.classList.remove('hidden');
+      }
       setBusy(false);
       refreshRemoveButton();
       refreshLocationChip();
@@ -894,6 +1097,7 @@
     btnRemove.addEventListener('click', async () => {
       resetProgress();
       hideError();
+      statusSummaryLink.classList.add('hidden');
       setBusy(true);
       setStatus('Removing shortcuts…', '#f57c00');
 
