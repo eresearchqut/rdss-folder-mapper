@@ -79,24 +79,6 @@ Win32 app dependency, or a post-install script. Set it once per machine.
 | `host` | Storage server hostname. The app derives `smb://host` (macOS/Linux) or `\\host` (Windows). |
 | `volume` | Share/volume name on the storage server. |
 
-::: warning Never include credentials
-`config.json` must **not** contain a username or password — those fields are
-stripped on load. Authentication is always per-user (browser OAuth for the DMP,
-and OS-native credential prompts/keychain for SMB). The values above are
-otherwise safe to distribute.
-:::
-
-::: warning macOS / Linux file ownership
-Place the file at the system path with standard read permissions for all users
-(e.g. `644`). On Windows, `C:\ProgramData` is already world-readable.
-:::
-
-::: warning Windows: save as UTF-8 *without* a BOM
-PowerShell 5.1's `Set-Content -Encoding UTF8` writes a byte-order mark that the
-app cannot parse. Use `Set-Content -Encoding utf8NoBOM` (PowerShell 7+) or write
-the file with another editor to avoid a silently empty config.
-:::
-
 ## Verifying a deployment
 
 1. Install the app via the platform installer.
