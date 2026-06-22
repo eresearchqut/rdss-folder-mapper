@@ -35,12 +35,15 @@ Download the installer for your platform from the [latest release](https://githu
 | Platform | Download |
 |---|---|
 | 🪟 Windows | [`rdss-folder-mapper-gui-win.exe`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-win.exe) |
-| 🍎 macOS | [`rdss-folder-mapper-gui-mac.dmg`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac.dmg) |
+| 🍎 macOS (`.dmg`) | [`rdss-folder-mapper-gui-mac.dmg`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac.dmg) |
+| 🍎 macOS (`.pkg`, managed install) | [`rdss-folder-mapper-gui-mac.pkg`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac.pkg) |
 | 🐧 Linux | [`rdss-folder-mapper-gui-linux.AppImage`](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-linux.AppImage) |
 
-> **macOS note:** If macOS blocks the app on first launch, right-click the `.dmg` and choose **Open**, then click **Open** in the dialog.
+> **macOS note:** Most users want the `.dmg`. The `.pkg` is for managed/self-service deployment (e.g. Jamf) — see the [Deployment guide](https://eresearchqut.github.io/rdss-folder-mapper/guide/deployment). If macOS blocks the app on first launch, right-click the `.dmg` and choose **Open**, then click **Open** in the dialog.
 
 > **Linux note:** Make the AppImage executable first: `chmod +x rdss-folder-mapper-gui-linux.AppImage`
+
+> **IT administrators:** See the [Deployment guide](https://eresearchqut.github.io/rdss-folder-mapper/guide/deployment) for self-service distribution and the system config file location per OS.
 
 ## Quick Start — CLI
 

@@ -7,16 +7,21 @@ Download the installer for your operating system directly:
 | Platform | Download |
 |----------|----------|
 | **macOS** | [rdss-folder-mapper-gui-mac.dmg](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac.dmg) |
+| **macOS** (managed install) | [rdss-folder-mapper-gui-mac.pkg](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-mac.pkg) |
 | **Windows** | [rdss-folder-mapper-gui-win.exe](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-win.exe) |
 | **Linux** | [rdss-folder-mapper-gui-linux.AppImage](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest/download/rdss-folder-mapper-gui-linux.AppImage) |
 
 All releases are also listed on the [GitHub Releases](https://github.com/eresearchqut/rdss-folder-mapper/releases/latest) page.
+
+> **Deploying to many machines?** IT administrators should read the [Deployment guide](/guide/deployment) for self-service distribution (Jamf, Intune/SCCM) and the system config file location for each OS.
 
 ### macOS
 
 1. Open the `.dmg` file.
 2. Drag **RDSS Folder Mapper** into your Applications folder.
 3. On first launch, macOS may show a security prompt — right-click the app and choose **Open** to proceed.
+
+The `.pkg` is intended for managed deployment (e.g. Jamf Self Service); it installs the app into `/Applications` without user interaction. See the [Deployment guide](/guide/deployment).
 
 ### Windows
 
