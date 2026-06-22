@@ -1,6 +1,6 @@
 {
   "name": "rdss-folder-mapper-gui",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "private": true,
   "description": "Desktop GUI for RDSS Folder Mapper — map your research storage folders to your Desktop with a single click.",
   "main": "dist/main.js",
@@ -46,15 +46,13 @@
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
+            "universal"
           ]
         },
         {
           "target": "pkg",
           "arch": [
-            "x64",
-            "arm64"
+            "universal"
           ]
         }
       ],
