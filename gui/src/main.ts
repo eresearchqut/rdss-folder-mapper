@@ -21,9 +21,19 @@ interface Config {
   baseDir: string;
 }
 
+// Resolve the user's Desktop via Electron's known-folder lookup rather than
+// assuming ~/Desktop (the CLI's BASE_DIR). This is the Electron equivalent of
+// PowerShell's [Environment]::GetFolderPath("Desktop"): on Windows the Desktop
+// can be redirected (OneDrive Known Folder Move, Group Policy folder
+// redirection), so app.getPath('desktop') returns the real location. It is
+// resolved at runtime in the launching user's context, which matters because a
+// managed/system-context install would otherwise resolve a different profile's
+// Desktop. The "RDSS Folders" leaf is derived from BASE_DIR to stay in sync.
+const desktopBaseDir = (): string => path.join(app.getPath('desktop'), path.basename(BASE_DIR));
+
 const defaultConfig = (): Config => ({
   debug: false,
-  baseDir: BASE_DIR,
+  baseDir: desktopBaseDir(),
 });
 
 // Deployment config fields read from config.json alongside the binary/app.
