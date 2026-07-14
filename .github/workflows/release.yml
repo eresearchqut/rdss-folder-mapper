@@ -52,6 +52,9 @@ jobs:
       # Surfaced so step-level `if` can gate on secret presence without
       # referencing the secrets context directly in conditionals.
       HAS_MAC_SIGNING: ${{ secrets.MAC_CERT_APP_P12 != '' }}
+      # Azure Trusted Signing credential presence gates the signed Windows build.
+      # Absent on forks / PRs / repos without the secret, producing unsigned .exe.
+      HAS_WIN_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -98,7 +101,28 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
           rm -f "$RUNNER_TEMP/app.p12" "$RUNNER_TEMP/installer.p12"
 
+      # Windows: sign with Azure Trusted Signing. electron-builder installs the
+      # `TrustedSigning` PowerShell module and runs `Invoke-TrustedSigning` for
+      # every produced executable/installer. The AZURE_* env vars authenticate to
+      # Microsoft Entra ID (EnvironmentCredential); the non-secret account /
+      # profile / endpoint / publisher come from repository variables so they can
+      # be reconfigured without a code change. Only runs when the signing secret
+      # is present, so forks / PRs still get an unsigned build via the step below.
+      - name: Package GUI (Windows, Azure Trusted Signing)
+        if: matrix.os == 'windows-latest' && env.HAS_WIN_SIGNING == 'true'
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: >-
+          npm run dist --workspace=gui --
+          "--config.win.azureSignOptions.publisherName=${{ vars.WIN_PUBLISHER_NAME }}"
+          "--config.win.azureSignOptions.endpoint=${{ vars.AZURE_TS_ENDPOINT }}"
+          "--config.win.azureSignOptions.codeSigningAccountName=${{ vars.AZURE_TS_ACCOUNT }}"
+          "--config.win.azureSignOptions.certificateProfileName=${{ vars.AZURE_TS_PROFILE }}"
+
       - name: Package GUI
+        if: ${{ !(matrix.os == 'windows-latest' && env.HAS_WIN_SIGNING == 'true') }}
         env:
           # Used by build/notarize.js (afterSign hook). Empty on non-mac /
           # secret-less runs, which makes notarization skip gracefully.
