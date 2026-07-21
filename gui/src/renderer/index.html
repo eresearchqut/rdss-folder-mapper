@@ -597,7 +597,12 @@
       try {
         const { url, websiteId } = await window.api.getAnalyticsConfig();
         if (!url || !websiteId) return;
-        umami = { endpoint: `${url.replace(/\/$/, '')}/api/send`, websiteId };
+        // Accept either a base URL or a URL that already includes the collect
+        // path, so a config of e.g. https://host or https://host/api/send both
+        // resolve to a single, correct endpoint (never .../api/send/api/send).
+        const base = url.replace(/\/+$/, '');
+        const endpoint = /\/api\/send$/.test(base) ? base : `${base}/api/send`;
+        umami = { endpoint, websiteId };
         // Sanitized "app opened" pageview (no name = pageview in Umami).
         track();
       } catch { /* analytics are best-effort; ignore setup failures */ }

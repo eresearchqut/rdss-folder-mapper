@@ -100,11 +100,15 @@ The website id is baked into the bundle at build time (see [`build.js`](build.js
 - **Production builds:** read the id from the `UMAMI_WEBSITE_ID` environment
   variable, wired in CI from the `UMAMI_WEBSITE_ID` **repository secret**.
 
-The collect **URL** resolves at runtime, in priority order:
+The Umami **base URL** resolves at runtime, in priority order:
 
 1. `umamiUrl` in the deployment `config.json` (IT-provisioned / per-machine override).
 2. The build-time `UMAMI_URL` default, wired in CI from the `UMAMI_URL`
    **repository variable**.
+
+Provide the Umami **base URL** (e.g. `https://umami.eres.qut.edu.au`); the
+renderer appends the collect path (`/api/send`) itself. A value that already
+includes `/api/send` is also accepted and used as-is, so it is never duplicated.
 
 For security the renderer can only reach the origin allowed by its CSP
 `connect-src` (`https://umami.eres.qut.edu.au`). A resolved URL is therefore
@@ -119,7 +123,7 @@ analytics are disabled and nothing is sent.
 | CI setting | Type | Purpose |
 | --- | --- | --- |
 | `UMAMI_WEBSITE_ID` | Repository secret | Production Umami website id, embedded into release GUI builds |
-| `UMAMI_URL` | Repository variable | Default Umami collect URL baked into release GUI builds (overridable via `config.json` `umamiUrl`) |
+| `UMAMI_URL` | Repository variable | Default Umami **base URL** (e.g. `https://umami.eres.qut.edu.au`; the `/api/send` path is appended by the renderer) baked into release GUI builds, overridable via `config.json` `umamiUrl` |
 
 ## Code signing
 
