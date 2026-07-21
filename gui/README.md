@@ -72,19 +72,22 @@ version tag is pushed.
 ## Analytics
 
 The GUI reports privacy-preserving usage analytics to a self-hosted
-[Umami](https://umami.is/) instance at `https://umami.eres.qut.edu.au`. Only
-event names and coarse, non-identifying outcome categories are sent (e.g. a map
-finishing with `success` / `empty` / `error` / `cancelled`). **No** usernames,
-folder names, project titles, URLs, or exact counts are ever transmitted, and
-Umami is cookieless.
+[Umami](https://umami.is/) instance at `https://umami.eres.qut.edu.au`. Each
+event carries only an event name, a coarse non-identifying outcome category
+(e.g. a map finishing with `success` / `empty` / `error` / `cancelled`), and a
+small set of static fields: a sanitized `url` of `/`, a fixed `hostname`/`title`,
+and the website id. **No** usernames, folder names, project titles, real URLs or
+file paths, exact counts, `navigator.language`, or screen resolution are ever
+transmitted, and Umami is cookieless.
 
 Rather than loading Umami's remote `script.js`, the renderer POSTs events
-directly to the Umami collect API (`/api/send`) with a fixed `url` (`/`). This
-keeps the Electron CSP at `script-src 'self'` (no remote JavaScript in the
-renderer) and guarantees the automatic pageview never leaks the app's `file://`
-path — which on Windows would contain `C:\Users\<username>\...`. Tracking is
-best-effort: if the endpoint is blocked or the machine is offline, the app is
-unaffected.
+directly to the Umami collect API (`/api/send`). This keeps the Electron CSP
+free of any remote script origin (`script-src` stays `'self' 'unsafe-inline'`,
+so no remote JavaScript can run in the renderer) and lets us send a sanitized
+`url` of `/` instead of relying on Umami's automatic pageview, which would
+otherwise report the app's `file://` path — on Windows that would contain
+`C:\Users\<username>\...`. Tracking is best-effort: if the endpoint is blocked or
+the machine is offline, the app is unaffected.
 
 The Umami website id is baked into the bundle at build time (see
 [`build.js`](build.js)):
