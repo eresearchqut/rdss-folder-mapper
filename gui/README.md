@@ -98,19 +98,19 @@ The website id is baked into the bundle at build time (see [`build.js`](build.js
 - **Production builds:** read the id from the `UMAMI_WEBSITE_ID` environment
   variable, wired in CI from the `UMAMI_WEBSITE_ID` **repository secret**.
 
-The collect **host** resolves at runtime, in priority order:
+The collect **URL** resolves at runtime, in priority order:
 
-1. `umamiHost` in the deployment `config.json` (IT-provisioned / per-machine override).
-2. The build-time `UMAMI_HOST` default, wired in CI from the `UMAMI_HOST`
+1. `umamiUrl` in the deployment `config.json` (IT-provisioned / per-machine override).
+2. The build-time `UMAMI_URL` default, wired in CI from the `UMAMI_URL`
    **repository variable**.
 
-There is **no hardcoded host default**. If neither source provides a host,
+There is **no hardcoded URL default**. If neither source provides a URL,
 analytics are disabled and nothing is sent.
 
 | CI setting | Type | Purpose |
 | --- | --- | --- |
 | `UMAMI_WEBSITE_ID` | Repository secret | Production Umami website id, embedded into release GUI builds |
-| `UMAMI_HOST` | Repository variable | Default Umami collect host baked into release GUI builds (overridable via `config.json` `umamiHost`) |
+| `UMAMI_URL` | Repository variable | Default Umami collect URL baked into release GUI builds (overridable via `config.json` `umamiUrl`) |
 
 ## Code signing
 
