@@ -352,6 +352,15 @@ ipcMain.handle('get-config-sources', () => getConfigSources());
 
 ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
 
+// Analytics (Umami) config for the renderer. The website id is baked in at build
+// time (see gui/build.js); the script URL is a fixed constant. Kept in the main
+// process so the id can vary per build without being hard-coded in the static
+// renderer HTML.
+ipcMain.handle('get-analytics-config', () => ({
+  scriptUrl: 'https://umami.eres.qut.edu.au/script.js',
+  websiteId: process.env.UMAMI_WEBSITE_ID,
+}));
+
 // Lets the renderer grow/shrink the window to fit its visible content. Width is
 // kept fixed; height is clamped to the work area so the window never exceeds the
 // screen. Used to make the settings page adaptive as diagnostics are revealed.

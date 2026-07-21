@@ -9,11 +9,20 @@ const path = require('path');
 const alias = {
   'rdss-folder-mapper': path.resolve(__dirname, '../cli/dist/index.js'),
 };
+// Bake the Umami analytics website id into the bundle at build time. Production
+// builds set UMAMI_WEBSITE_ID (from a GitHub Actions secret); local/dev builds
+// fall back to the shared testing id. The script URL is a fixed constant.
+const umamiWebsiteId =
+  process.env.UMAMI_WEBSITE_ID || 'a1b2ad15-0a5c-444e-a2c1-5bccda473838';
+
 const shared = {
   bundle: true,
   platform: 'node',
   external: ['electron'],
   alias,
+  define: {
+    'process.env.UMAMI_WEBSITE_ID': JSON.stringify(umamiWebsiteId),
+  },
 };
 
 Promise.all([
