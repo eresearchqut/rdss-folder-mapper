@@ -586,9 +586,9 @@
 
     (async () => {
       try {
-        const { host, websiteId } = await window.api.getAnalyticsConfig();
-        if (!host || !websiteId) return;
-        umami = { endpoint: `${host.replace(/\/$/, '')}/api/send`, websiteId };
+        const { url, websiteId } = await window.api.getAnalyticsConfig();
+        if (!url || !websiteId) return;
+        umami = { endpoint: `${url.replace(/\/$/, '')}/api/send`, websiteId };
         // Sanitized "app opened" pageview (no name = pageview in Umami).
         track();
       } catch { /* analytics are best-effort; ignore setup failures */ }
