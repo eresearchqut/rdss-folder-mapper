@@ -114,6 +114,9 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          # Baked into the GUI bundle at build time (see gui/build.js). Absent on
+          # forks / secret-less runs, falling back to the local testing id.
+          UMAMI_WEBSITE_ID: ${{ secrets.UMAMI_WEBSITE_ID }}
         run: >-
           npm run dist --workspace=gui --
           "--config.win.azureSignOptions.publisherName=${{ vars.WIN_PUBLISHER_NAME }}"
@@ -129,6 +132,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Baked into the GUI bundle at build time (see gui/build.js). Absent on
+          # forks / secret-less runs, falling back to the local testing id.
+          UMAMI_WEBSITE_ID: ${{ secrets.UMAMI_WEBSITE_ID }}
         run: npm run dist --workspace=gui
 
       - name: Upload GUI artifact

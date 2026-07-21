@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://umami.eres.qut.edu.au; style-src 'unsafe-inline'; connect-src 'self' https://umami.eres.qut.edu.au" />
   <title>RDSS Folder Mapper</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -552,6 +552,33 @@
   </div>
 
   <script>
+    // ─── Analytics (Umami) ─────────────────────────────────────────────────────
+    // Privacy-preserving usage analytics. We only ever send event names and
+    // coarse, non-identifying outcome categories — never usernames, folder names,
+    // project titles, URLs, or exact counts. track() is null-safe: if the Umami
+    // script failed to load (offline / CSP-blocked / 404) calls are silently
+    // skipped so analytics can never break the app.
+    const track = (name, props) => {
+      try {
+        if (window.umami && typeof window.umami.track === 'function') {
+          props ? window.umami.track(name, props) : window.umami.track(name);
+        }
+      } catch { /* never let analytics surface an error to the user */ }
+    };
+
+    (async () => {
+      try {
+        const { scriptUrl, websiteId } = await window.api.getAnalyticsConfig();
+        if (!scriptUrl || !websiteId) return;
+        const s = document.createElement('script');
+        s.async = true;
+        s.defer = true;
+        s.src = scriptUrl;
+        s.setAttribute('data-website-id', websiteId);
+        document.head.appendChild(s);
+      } catch { /* analytics are best-effort; ignore setup failures */ }
+    })();
+
     const modalCredentials = document.getElementById('modalCredentials');
     const credUsername     = document.getElementById('credUsername');
     const credPassword     = document.getElementById('credPassword');
@@ -576,6 +603,7 @@
     };
 
     btnCredCancel.addEventListener('click', async () => {
+      track('credentials-cancelled');
       hideCredentialsModal();
       // Send empty response so the worker doesn't hang
       await window.api.submitCredentials({ username: '', password: '' });
@@ -593,6 +621,7 @@
       credPassword.style.borderColor = '';
       hideCredentialsModal();
       const domain = credDomain.value.trim() || undefined;
+      track('credentials-submitted');
       await window.api.submitCredentials({ username, password, domain });
     });
 
@@ -691,6 +720,7 @@
     };
 
     const openSummaryModal = () => {
+      track('summary-opened');
       summarySort = { key: 'status', dir: 'asc' };
       summaryPage = 0;
       renderSummaryPage();
@@ -819,8 +849,8 @@
       refreshLocationChip();
     });
 
-    btnActivityLog.addEventListener('click', () => window.api.openLogFile());
-    btnRdssHelp.addEventListener('click', () => window.api.openRdssHelp());
+    btnActivityLog.addEventListener('click', () => { track('activity-log-opened'); window.api.openLogFile(); });
+    btnRdssHelp.addEventListener('click', () => { track('rdss-help-opened'); window.api.openRdssHelp(); });
     helpFaqLink.addEventListener('click', () => window.api.openRdssHelp());
     statusLogLink.addEventListener('click', () => window.api.openLogFile());
 
@@ -849,6 +879,7 @@
     // Structured lifecycle events from the CLI
     window.api.onEvent(event => {
       if (event.type === 'auth:browser-opened') {
+        track('auth-browser-opened');
         setStatus('Waiting for browser login…', '#f57c00');
         showStep('Please complete login in your browser…');
         progressFolder.textContent = String(event.url ?? '');
@@ -1004,7 +1035,12 @@
     };
 
     btnSettings.addEventListener('click', () => {
-      panelSettings.classList.contains('hidden') ? showSettings() : showMain();
+      if (panelSettings.classList.contains('hidden')) {
+        track('settings-opened');
+        showSettings();
+      } else {
+        showMain();
+      }
     });
 
     locationChip.addEventListener('click', () => {
@@ -1030,6 +1066,7 @@
     });
 
     btnClearKeychain.addEventListener('click', async () => {
+      track('clear-keychain');
       btnClearKeychain.disabled = true;
       btnClearKeychain.textContent = 'Clearing…';
       await window.api.clearAuth();
@@ -1059,17 +1096,21 @@
       statusSummaryLink.classList.add('hidden');
       setBusy(true);
       setStatus('Connecting folders…', '#f57c00');
+      track('map-folders-start');
 
       const result = await window.api.mapFolders();
 
       if (result.cancelled) {
+        track('map-folders-complete', { outcome: 'cancelled' });
         setStatus('Cancelled', '#888');
         resetProgress();
       } else if (result.success && mappedFolderCount === 0) {
+        track('map-folders-complete', { outcome: 'empty' });
         setStatus('No research folders found', '#f57c00');
         resetProgress();
         helpCard.classList.remove('hidden');
       } else if (result.success) {
+        track('map-folders-complete', { outcome: 'success' });
         setStatus('All done! Folders are ready to open', '#2e7d32');
         progressFill.classList.remove('indeterminate');
         progressFill.style.marginLeft = '0';
@@ -1078,6 +1119,7 @@
         progressLabel.textContent = '✓ All folders connected';
         progressFolder.textContent = '';
       } else {
+        track('map-folders-complete', { outcome: 'error' });
         setStatus('Error', '#c62828', true);
         resetProgress();
         if (result.error) {
@@ -1100,12 +1142,15 @@
       statusSummaryLink.classList.add('hidden');
       setBusy(true);
       setStatus('Removing shortcuts…', '#f57c00');
+      track('remove-mappings-start');
 
       const result = await window.api.removeMappings();
 
       if (result.success) {
+        track('remove-mappings-complete', { outcome: 'success' });
         setStatus('Shortcuts removed', '#2e7d32');
       } else {
+        track('remove-mappings-complete', { outcome: 'error' });
         setStatus('Error', '#c62828', true);
         if (result.error) {
           showError(result.error);

@@ -69,6 +69,28 @@ npm run dist --workspace=gui
 Releases are produced automatically by the `release` GitHub workflow when a
 version tag is pushed.
 
+## Analytics
+
+The GUI reports privacy-preserving usage analytics to a self-hosted
+[Umami](https://umami.is/) instance at `https://umami.eres.qut.edu.au`. Only
+event names and coarse, non-identifying outcome categories are sent (e.g. a map
+finishing with `success` / `empty` / `error` / `cancelled`). **No** usernames,
+folder names, project titles, URLs, or exact counts are ever transmitted, and
+Umami is cookieless. Tracking is best-effort: if the script is blocked or the
+machine is offline, the app is unaffected.
+
+The Umami website id is baked into the bundle at build time (see
+[`build.js`](build.js)):
+
+- **Local / dev builds:** fall back to a shared testing id, so no configuration
+  is needed for development.
+- **Production builds:** read the id from the `UMAMI_WEBSITE_ID` environment
+  variable, wired in CI from the `UMAMI_WEBSITE_ID` **repository secret**.
+
+| Secret | Purpose |
+| --- | --- |
+| `UMAMI_WEBSITE_ID` | Production Umami website id, embedded into release GUI builds |
+
 ## Code signing
 
 Signing is applied automatically by the `release` workflow **only when the
