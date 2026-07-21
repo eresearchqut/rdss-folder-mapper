@@ -11,7 +11,8 @@ const alias = {
 };
 // Bake the Umami analytics website id into the bundle at build time. Production
 // builds set UMAMI_WEBSITE_ID (from a GitHub Actions secret); local/dev builds
-// fall back to the shared testing id. The script URL is a fixed constant.
+// fall back to the shared testing id. The renderer POSTs events straight to the
+// Umami collect API, so no remote script is bundled or loaded.
 const umamiWebsiteId =
   process.env.UMAMI_WEBSITE_ID || 'a1b2ad15-0a5c-444e-a2c1-5bccda473838';
 
