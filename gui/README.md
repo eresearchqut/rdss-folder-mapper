@@ -93,8 +93,10 @@ the machine is offline, the app is unaffected.
 
 The website id is baked into the bundle at build time (see [`build.js`](build.js)):
 
-- **Local / dev builds:** fall back to a shared testing id, so no configuration
-  is needed for development.
+- **Local / dev builds:** the website id falls back to a shared testing id, so it
+  needs no configuration. Note that analytics still only run if a collect URL is
+  resolved (see below) — a local build with no `UMAMI_URL` and no `umamiUrl` in
+  `config.json` will not send anything.
 - **Production builds:** read the id from the `UMAMI_WEBSITE_ID` environment
   variable, wired in CI from the `UMAMI_WEBSITE_ID` **repository secret**.
 
@@ -104,7 +106,14 @@ The collect **URL** resolves at runtime, in priority order:
 2. The build-time `UMAMI_URL` default, wired in CI from the `UMAMI_URL`
    **repository variable**.
 
-There is **no hardcoded URL default**. If neither source provides a URL,
+For security the renderer can only reach the origin allowed by its CSP
+`connect-src` (`https://umami.eres.qut.edu.au`). A resolved URL is therefore
+**origin-validated**: a `umamiUrl` pointing at a different origin is ignored
+(with a logged warning) rather than silently blocked by CSP. Changing the origin
+requires updating both the CSP `<meta>` in `index.html` and
+`ANALYTICS_ALLOWED_ORIGIN` in `main.ts`.
+
+There is **no hardcoded URL default**. If nothing resolves to a permitted URL,
 analytics are disabled and nothing is sent.
 
 | CI setting | Type | Purpose |
