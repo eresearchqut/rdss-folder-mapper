@@ -53,8 +53,11 @@ jobs:
       # referencing the secrets context directly in conditionals.
       HAS_MAC_SIGNING: ${{ secrets.MAC_CERT_APP_P12 != '' }}
       # Azure Trusted Signing credential presence gates the signed Windows build.
-      # Absent on forks / PRs / repos without the secret, producing unsigned .exe.
-      HAS_WIN_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' }}
+      # Requires the secret AND all non-secret Trusted Signing vars: if any is
+      # missing the signed step would fail rather than fall back, so we gate on
+      # the full set and produce an unsigned .exe when the config is incomplete
+      # (forks / PRs / repos without the secret).
+      HAS_WIN_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' && vars.AZURE_TS_ENDPOINT != '' && vars.AZURE_TS_ACCOUNT != '' && vars.AZURE_TS_PROFILE != '' && vars.WIN_PUBLISHER_NAME != '' }}
 
     steps:
       - uses: actions/checkout@v4

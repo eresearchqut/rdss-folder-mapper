@@ -361,7 +361,7 @@ ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
 // gui/src/renderer/index.html (there is a matching reminder comment there).
 const ANALYTICS_ALLOWED_ORIGIN = 'https://umami.eres.qut.edu.au';
 
-// Resolve the Umami collect URL from the deployment config.json (`umamiUrl`)
+// Resolve the Umami base URL from the deployment config.json (`umamiUrl`)
 // then the build-time UMAMI_URL default. A candidate is only honoured if its
 // origin matches ANALYTICS_ALLOWED_ORIGIN; otherwise it is ignored (with a
 // warning) and the next source is tried. Returns '' when nothing resolves, which
@@ -389,7 +389,7 @@ const resolveUmamiUrl = (): string => {
 };
 
 // Analytics (Umami) config for the renderer. The website id is baked in at build
-// time (see gui/build.js); the collect URL is resolved and origin-validated by
+// time (see gui/build.js); the base URL is resolved and origin-validated by
 // resolveUmamiUrl. We deliberately expose only the collection URL + id, not a
 // remote script: the renderer POSTs events directly to Umami's collect API so
 // the Electron CSP can stay 'self' (no remote JS execution) and every payload is
