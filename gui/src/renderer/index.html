@@ -558,10 +558,11 @@
     // script-src (remote JS with access to window.api.*) and its automatic
     // pageview would report the renderer's file:// path, which on Windows embeds
     // C:\Users\<username>\... Instead we POST sanitized events straight to Umami's
-    // collect API with a fixed url ('/') so no path, username, or other specifics
-    // ever leave the app. We only send event names and coarse, non-identifying
-    // outcome categories. track() is null-safe and best-effort: any failure
-    // (offline / blocked / unconfigured) is silently swallowed.
+    // collect API. The payload is deliberately minimal: a fixed url ('/'), a
+    // static hostname/title, the event name, and coarse non-identifying outcome
+    // data. We omit navigator.language and screen resolution to avoid adding
+    // client-fingerprinting signals. track() is null-safe and best-effort: any
+    // failure (offline / blocked / unconfigured) is silently swallowed.
     let umami = null;
 
     const track = (name, data) => {
@@ -569,8 +570,6 @@
       const payload = {
         website: umami.websiteId,
         hostname: 'app',
-        language: navigator.language,
-        screen: `${screen.width}x${screen.height}`,
         title: 'RDSS Folder Mapper',
         url: '/',
       };
