@@ -353,12 +353,14 @@ ipcMain.handle('get-config-sources', () => getConfigSources());
 ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
 
 // Analytics (Umami) config for the renderer. The website id is baked in at build
-// time (see gui/build.js); the script URL is a fixed constant. Kept in the main
-// process so the id can vary per build without being hard-coded in the static
-// renderer HTML.
-ipcMain.handle('get-analytics-config', () => ({
-  scriptUrl: 'https://umami.eres.qut.edu.au/script.js',
-  websiteId: process.env.UMAMI_WEBSITE_ID,
+// time (see gui/build.js). We deliberately expose only the collection host + id,
+// not a remote script: the renderer POSTs events directly to Umami's collect API
+// so the Electron CSP can stay 'self' (no remote JS execution) and every payload
+// is sanitized (no file:// path / username leakage). websiteId is normalized to a
+// string so the IPC payload shape is stable when the env var is unset.
+ipcMain.handle('get-analytics-config', (): { host: string; websiteId: string } => ({
+  host: 'https://umami.eres.qut.edu.au',
+  websiteId: process.env.UMAMI_WEBSITE_ID ?? '',
 }));
 
 // Lets the renderer grow/shrink the window to fit its visible content. Width is
