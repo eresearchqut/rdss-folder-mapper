@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://umami.eres.qut.edu.au; style-src 'unsafe-inline'; connect-src 'self' https://umami.eres.qut.edu.au" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://umami.eres.qut.edu.au" />
   <title>RDSS Folder Mapper</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -553,29 +553,45 @@
 
   <script>
     // ─── Analytics (Umami) ─────────────────────────────────────────────────────
-    // Privacy-preserving usage analytics. We only ever send event names and
-    // coarse, non-identifying outcome categories — never usernames, folder names,
-    // project titles, URLs, or exact counts. track() is null-safe: if the Umami
-    // script failed to load (offline / CSP-blocked / 404) calls are silently
-    // skipped so analytics can never break the app.
-    const track = (name, props) => {
-      try {
-        if (window.umami && typeof window.umami.track === 'function') {
-          props ? window.umami.track(name, props) : window.umami.track(name);
-        }
-      } catch { /* never let analytics surface an error to the user */ }
+    // Privacy-preserving usage analytics. We do NOT load Umami's remote script:
+    // that would require allowing an external origin in the Electron CSP
+    // script-src (remote JS with access to window.api.*) and its automatic
+    // pageview would report the renderer's file:// path, which on Windows embeds
+    // C:\Users\<username>\... Instead we POST sanitized events straight to Umami's
+    // collect API with a fixed url ('/') so no path, username, or other specifics
+    // ever leave the app. We only send event names and coarse, non-identifying
+    // outcome categories. track() is null-safe and best-effort: any failure
+    // (offline / blocked / unconfigured) is silently swallowed.
+    let umami = null;
+
+    const track = (name, data) => {
+      if (!umami) return;
+      const payload = {
+        website: umami.websiteId,
+        hostname: 'app',
+        language: navigator.language,
+        screen: `${screen.width}x${screen.height}`,
+        title: 'RDSS Folder Mapper',
+        url: '/',
+      };
+      if (name) payload.name = name;
+      if (data) payload.data = data;
+      // Best-effort beacon; never await or surface errors to the user.
+      fetch(umami.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'event', payload }),
+        keepalive: true,
+      }).catch(() => { /* analytics are best-effort */ });
     };
 
     (async () => {
       try {
-        const { scriptUrl, websiteId } = await window.api.getAnalyticsConfig();
-        if (!scriptUrl || !websiteId) return;
-        const s = document.createElement('script');
-        s.async = true;
-        s.defer = true;
-        s.src = scriptUrl;
-        s.setAttribute('data-website-id', websiteId);
-        document.head.appendChild(s);
+        const { host, websiteId } = await window.api.getAnalyticsConfig();
+        if (!host || !websiteId) return;
+        umami = { endpoint: `${host.replace(/\/$/, '')}/api/send`, websiteId };
+        // Sanitized "app opened" pageview (no name = pageview in Umami).
+        track();
       } catch { /* analytics are best-effort; ignore setup failures */ }
     })();
 

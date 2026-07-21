@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   getResolvedConfig: (): Promise<Record<string, unknown>> =>
     ipcRenderer.invoke('get-resolved-config'),
 
-  getAnalyticsConfig: (): Promise<{ scriptUrl: string; websiteId: string }> =>
+  getAnalyticsConfig: (): Promise<{ host: string; websiteId: string }> =>
     ipcRenderer.invoke('get-analytics-config'),
 
   resizeContentHeight: (height: number): Promise<void> =>
