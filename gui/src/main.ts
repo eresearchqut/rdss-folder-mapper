@@ -357,7 +357,8 @@ ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
 // gui/src/renderer/index.html). The renderer can only POST analytics to this
 // origin, so any configured URL pointing elsewhere is rejected here — and
 // analytics stay disabled — rather than being silently blocked by CSP at
-// request time. Keep this in sync with the connect-src in index.html.
+// request time. Keep this in sync with the connect-src in
+// gui/src/renderer/index.html (there is a matching reminder comment there).
 const ANALYTICS_ALLOWED_ORIGIN = 'https://umami.eres.qut.edu.au';
 
 // Resolve the Umami collect URL from the deployment config.json (`umamiUrl`)
