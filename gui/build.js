@@ -9,12 +9,16 @@ const path = require('path');
 const alias = {
   'rdss-folder-mapper': path.resolve(__dirname, '../cli/dist/index.js'),
 };
-// Bake the Umami analytics website id into the bundle at build time. Production
-// builds set UMAMI_WEBSITE_ID (from a GitHub Actions secret); local/dev builds
-// fall back to the shared testing id. The renderer POSTs events straight to the
-// Umami collect API, so no remote script is bundled or loaded.
+// Bake the Umami analytics website id and default host into the bundle at build
+// time. Production builds set UMAMI_WEBSITE_ID (from a GitHub Actions secret) and
+// UMAMI_HOST; local/dev builds fall back to the shared testing id. There is no
+// hardcoded host default: if UMAMI_HOST is unset and no deployment config.json
+// provides `umamiHost`, the host resolves to '' and tracking is disabled. The
+// renderer POSTs events straight to the Umami collect API, so no remote script is
+// bundled or loaded.
 const umamiWebsiteId =
   process.env.UMAMI_WEBSITE_ID || 'a1b2ad15-0a5c-444e-a2c1-5bccda473838';
+const umamiHost = process.env.UMAMI_HOST || '';
 
 const shared = {
   bundle: true,
@@ -23,6 +27,7 @@ const shared = {
   alias,
   define: {
     'process.env.UMAMI_WEBSITE_ID': JSON.stringify(umamiWebsiteId),
+    'process.env.UMAMI_HOST': JSON.stringify(umamiHost),
   },
 };
 

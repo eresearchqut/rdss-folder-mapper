@@ -45,6 +45,7 @@ interface DeploymentConfig {
   domain?: string;
   host?: string;
   volume?: string;
+  umamiHost?: string;
 }
 
 // User settings live in settings.json (debug toggle + base dir). This is named
@@ -353,13 +354,16 @@ ipcMain.handle('get-config-sources', () => getConfigSources());
 ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
 
 // Analytics (Umami) config for the renderer. The website id is baked in at build
-// time (see gui/build.js). We deliberately expose only the collection host + id,
-// not a remote script: the renderer POSTs events directly to Umami's collect API
-// so the Electron CSP can stay 'self' (no remote JS execution) and every payload
-// is sanitized (no file:// path / username leakage). websiteId is normalized to a
-// string so the IPC payload shape is stable when the env var is unset.
+// time (see gui/build.js). The collect host resolves from the deployment
+// config.json (`umamiHost`) when present, otherwise the build-time UMAMI_HOST
+// default. There is no hardcoded host fallback: when neither is set the host is
+// '' and the renderer skips tracking entirely. We deliberately expose only the
+// collection host + id, not a remote script: the renderer POSTs events directly
+// to Umami's collect API so the Electron CSP can stay 'self' (no remote JS
+// execution) and every payload is sanitized (no file:// path / username leakage).
+// Both fields are normalized to strings so the IPC payload shape is stable.
 ipcMain.handle('get-analytics-config', (): { host: string; websiteId: string } => ({
-  host: 'https://umami.eres.qut.edu.au',
+  host: loadDeploymentConfig().umamiHost || process.env.UMAMI_HOST || '',
   websiteId: process.env.UMAMI_WEBSITE_ID ?? '',
 }));
 

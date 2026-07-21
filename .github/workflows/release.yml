@@ -117,6 +117,10 @@ jobs:
           # Baked into the GUI bundle at build time (see gui/build.js). Absent on
           # forks / secret-less runs, falling back to the local testing id.
           UMAMI_WEBSITE_ID: ${{ secrets.UMAMI_WEBSITE_ID }}
+          # Default Umami collect host baked in at build time; a deployment
+          # config.json (umamiHost) can still override it at runtime. Non-secret,
+          # so a repository variable. Falls back to the built-in default when unset.
+          UMAMI_HOST: ${{ vars.UMAMI_HOST }}
         run: >-
           npm run dist --workspace=gui --
           "--config.win.azureSignOptions.publisherName=${{ vars.WIN_PUBLISHER_NAME }}"
@@ -135,6 +139,10 @@ jobs:
           # Baked into the GUI bundle at build time (see gui/build.js). Absent on
           # forks / secret-less runs, falling back to the local testing id.
           UMAMI_WEBSITE_ID: ${{ secrets.UMAMI_WEBSITE_ID }}
+          # Default Umami collect host baked in at build time; a deployment
+          # config.json (umamiHost) can still override it at runtime. Non-secret,
+          # so a repository variable. No tracking when unset and no config host.
+          UMAMI_HOST: ${{ vars.UMAMI_HOST }}
         run: npm run dist --workspace=gui
 
       - name: Upload GUI artifact

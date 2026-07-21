@@ -72,13 +72,13 @@ version tag is pushed.
 ## Analytics
 
 The GUI reports privacy-preserving usage analytics to a self-hosted
-[Umami](https://umami.is/) instance at `https://umami.eres.qut.edu.au`. Each
-event carries only an event name, a coarse non-identifying outcome category
-(e.g. a map finishing with `success` / `empty` / `error` / `cancelled`), and a
-small set of static fields: a sanitized `url` of `/`, a fixed `hostname`/`title`,
-and the website id. **No** usernames, folder names, project titles, real URLs or
-file paths, exact counts, `navigator.language`, or screen resolution are ever
-transmitted, and Umami is cookieless.
+[Umami](https://umami.is/) instance. Each event carries only an event name, a
+coarse non-identifying outcome category (e.g. a map finishing with `success` /
+`empty` / `error` / `cancelled`), and a small set of static fields: a sanitized
+`url` of `/`, a fixed `hostname`/`title`, and the website id. **No** usernames,
+folder names, project titles, real URLs or file paths, exact counts,
+`navigator.language`, or screen resolution are ever transmitted, and Umami is
+cookieless.
 
 Rather than loading Umami's remote `script.js`, the renderer POSTs events
 directly to the Umami collect API (`/api/send`). This keeps the Electron CSP
@@ -89,17 +89,28 @@ otherwise report the app's `file://` path — on Windows that would contain
 `C:\Users\<username>\...`. Tracking is best-effort: if the endpoint is blocked or
 the machine is offline, the app is unaffected.
 
-The Umami website id is baked into the bundle at build time (see
-[`build.js`](build.js)):
+### Configuration
+
+The website id is baked into the bundle at build time (see [`build.js`](build.js)):
 
 - **Local / dev builds:** fall back to a shared testing id, so no configuration
   is needed for development.
 - **Production builds:** read the id from the `UMAMI_WEBSITE_ID` environment
   variable, wired in CI from the `UMAMI_WEBSITE_ID` **repository secret**.
 
-| Secret | Purpose |
-| --- | --- |
-| `UMAMI_WEBSITE_ID` | Production Umami website id, embedded into release GUI builds |
+The collect **host** resolves at runtime, in priority order:
+
+1. `umamiHost` in the deployment `config.json` (IT-provisioned / per-machine override).
+2. The build-time `UMAMI_HOST` default, wired in CI from the `UMAMI_HOST`
+   **repository variable**.
+
+There is **no hardcoded host default**. If neither source provides a host,
+analytics are disabled and nothing is sent.
+
+| CI setting | Type | Purpose |
+| --- | --- | --- |
+| `UMAMI_WEBSITE_ID` | Repository secret | Production Umami website id, embedded into release GUI builds |
+| `UMAMI_HOST` | Repository variable | Default Umami collect host baked into release GUI builds (overridable via `config.json` `umamiHost`) |
 
 ## Code signing
 
