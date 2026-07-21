@@ -576,10 +576,13 @@
       if (name) payload.name = name;
       if (data) payload.data = data;
       // Best-effort beacon; never await or surface errors to the user.
+      // no-referrer ensures no Referer header (which could carry the file://
+      // path / Windows username) is ever attached to the request.
       fetch(umami.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'event', payload }),
+        referrerPolicy: 'no-referrer',
         keepalive: true,
       }).catch(() => { /* analytics are best-effort */ });
     };

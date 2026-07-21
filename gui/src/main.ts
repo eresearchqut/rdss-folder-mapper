@@ -353,17 +353,49 @@ ipcMain.handle('get-config-sources', () => getConfigSources());
 
 ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
 
+// The single origin the renderer's CSP <meta> connect-src permits (see
+// gui/src/renderer/index.html). The renderer can only POST analytics to this
+// origin, so any configured URL pointing elsewhere is rejected here — and
+// analytics stay disabled — rather than being silently blocked by CSP at
+// request time. Keep this in sync with the connect-src in index.html.
+const ANALYTICS_ALLOWED_ORIGIN = 'https://umami.eres.qut.edu.au';
+
+// Resolve the Umami collect URL from the deployment config.json (`umamiUrl`)
+// then the build-time UMAMI_URL default. A candidate is only honoured if its
+// origin matches ANALYTICS_ALLOWED_ORIGIN; otherwise it is ignored (with a
+// warning) and the next source is tried. Returns '' when nothing resolves, which
+// disables tracking. There is no hardcoded URL default.
+const resolveUmamiUrl = (): string => {
+  const candidates = [loadDeploymentConfig().umamiUrl, process.env.UMAMI_URL];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    let origin: string;
+    try {
+      origin = new URL(candidate).origin;
+    } catch {
+      console.warn(`[analytics] ignoring invalid umamiUrl: ${candidate}`);
+      continue;
+    }
+    if (origin !== ANALYTICS_ALLOWED_ORIGIN) {
+      console.warn(
+        `[analytics] ignoring umamiUrl "${candidate}": origin not permitted by the renderer CSP (${ANALYTICS_ALLOWED_ORIGIN})`,
+      );
+      continue;
+    }
+    return candidate;
+  }
+  return '';
+};
+
 // Analytics (Umami) config for the renderer. The website id is baked in at build
-// time (see gui/build.js). The collect URL resolves from the deployment
-// config.json (`umamiUrl`) when present, otherwise the build-time UMAMI_URL
-// default. There is no hardcoded URL fallback: when neither is set the URL is
-// '' and the renderer skips tracking entirely. We deliberately expose only the
-// collection URL + id, not a remote script: the renderer POSTs events directly
-// to Umami's collect API so the Electron CSP can stay 'self' (no remote JS
-// execution) and every payload is sanitized (no file:// path / username leakage).
-// Both fields are normalized to strings so the IPC payload shape is stable.
+// time (see gui/build.js); the collect URL is resolved and origin-validated by
+// resolveUmamiUrl. We deliberately expose only the collection URL + id, not a
+// remote script: the renderer POSTs events directly to Umami's collect API so
+// the Electron CSP can stay 'self' (no remote JS execution) and every payload is
+// sanitized (no file:// path / username leakage). Both fields are normalized to
+// strings so the IPC payload shape is stable.
 ipcMain.handle('get-analytics-config', (): { url: string; websiteId: string } => ({
-  url: loadDeploymentConfig().umamiUrl || process.env.UMAMI_URL || '',
+  url: resolveUmamiUrl(),
   websiteId: process.env.UMAMI_WEBSITE_ID ?? '',
 }));
 
