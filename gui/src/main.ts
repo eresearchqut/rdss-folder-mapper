@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, screen, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, screen, nativeImage, session } from 'electron';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -46,6 +46,7 @@ interface DeploymentConfig {
   host?: string;
   volume?: string;
   umamiUrl?: string;
+  umamiWebsiteId?: string;
 }
 
 // User settings live in settings.json (debug toggle + base dir). This is named
@@ -218,6 +219,21 @@ const focusMainWindow = () => {
 
 app.whenReady().then(() => {
   migrateLegacySettings();
+  // Apply the renderer CSP as a response header rather than a static <meta> in
+  // index.html, so connect-src can include the configured Umami origin at
+  // runtime (see buildCspHeader). Scoped to the top-level document response.
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    if (details.resourceType === 'mainFrame') {
+      callback({
+        responseHeaders: {
+          ...details.responseHeaders,
+          'Content-Security-Policy': [buildCspHeader()],
+        },
+      });
+      return;
+    }
+    callback({ responseHeaders: details.responseHeaders });
+  });
   // On macOS the Dock icon is the Electron default during development (the
   // packaged .app uses the bundled .icns). Set it explicitly so dev runs show
   // the real icon too. BrowserWindow.icon is ignored for the Dock on macOS.
@@ -353,34 +369,20 @@ ipcMain.handle('get-config-sources', () => getConfigSources());
 
 ipcMain.handle('get-resolved-config', () => loadDeploymentConfig());
 
-// The single origin the renderer's CSP <meta> connect-src permits (see
-// gui/src/renderer/index.html). The renderer can only POST analytics to this
-// origin, so any configured URL pointing elsewhere is rejected here — and
-// analytics stay disabled — rather than being silently blocked by CSP at
-// request time. Keep this in sync with the connect-src in
-// gui/src/renderer/index.html (there is a matching reminder comment there).
-const ANALYTICS_ALLOWED_ORIGIN = 'https://umami.eres.qut.edu.au';
-
-// Resolve the Umami base URL from the deployment config.json (`umamiUrl`)
-// then the build-time UMAMI_URL default. A candidate is only honoured if its
-// origin matches ANALYTICS_ALLOWED_ORIGIN; otherwise it is ignored (with a
-// warning) and the next source is tried. Returns '' when nothing resolves, which
-// disables tracking. There is no hardcoded URL default.
+// Resolve the Umami base URL from the deployment config.json (`umamiUrl`) then
+// the build-time UMAMI_URL default. A candidate must parse as a valid URL;
+// otherwise it is ignored (with a warning) and the next source is tried. Returns
+// '' when nothing resolves, which disables tracking. There is no hardcoded URL
+// default. The resolved origin is added to the renderer's CSP connect-src (see
+// buildCspHeader), so analytics can reach whatever host is configured.
 const resolveUmamiUrl = (): string => {
   const candidates = [loadDeploymentConfig().umamiUrl, process.env.UMAMI_URL];
   for (const candidate of candidates) {
     if (!candidate) continue;
-    let origin: string;
     try {
-      origin = new URL(candidate).origin;
+      new URL(candidate);
     } catch {
       console.warn(`[analytics] ignoring invalid umamiUrl: ${candidate}`);
-      continue;
-    }
-    if (origin !== ANALYTICS_ALLOWED_ORIGIN) {
-      console.warn(
-        `[analytics] ignoring umamiUrl "${candidate}": origin not permitted by the renderer CSP (${ANALYTICS_ALLOWED_ORIGIN})`,
-      );
       continue;
     }
     return candidate;
@@ -388,16 +390,36 @@ const resolveUmamiUrl = (): string => {
   return '';
 };
 
-// Analytics (Umami) config for the renderer. The website id is baked in at build
-// time (see gui/build.js); the base URL is resolved and origin-validated by
-// resolveUmamiUrl. We deliberately expose only the collection URL + id, not a
+// Build the renderer's Content-Security-Policy. connect-src is derived from the
+// resolved Umami origin so analytics can POST to whatever host is configured
+// (config.json `umamiUrl` / build-time UMAMI_URL); when no URL resolves, only
+// 'self' is allowed and no external request is possible. This replaces the former
+// static CSP <meta> in index.html so the single allowed origin no longer has to
+// be hardcoded there.
+const buildCspHeader = (): string => {
+  const umamiUrl = resolveUmamiUrl();
+  let connectSrc = "'self'";
+  if (umamiUrl) {
+    try {
+      connectSrc += ` ${new URL(umamiUrl).origin}`;
+    } catch {
+      /* resolveUmamiUrl already validated; ignore defensively */
+    }
+  }
+  return `default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src ${connectSrc}`;
+};
+
+// Analytics (Umami) config for the renderer. The website id is resolved from the
+// deployment config.json (`umamiWebsiteId`) then the build-time UMAMI_WEBSITE_ID
+// default (see gui/build.js); the base URL is resolved by resolveUmamiUrl. We
+// deliberately expose only the collection URL + id, not a
 // remote script: the renderer POSTs events directly to Umami's collect API so
 // the Electron CSP can stay 'self' (no remote JS execution) and every payload is
 // sanitized (no file:// path / username leakage). Both fields are normalized to
 // strings so the IPC payload shape is stable.
 ipcMain.handle('get-analytics-config', (): { url: string; websiteId: string } => ({
   url: resolveUmamiUrl(),
-  websiteId: process.env.UMAMI_WEBSITE_ID ?? '',
+  websiteId: loadDeploymentConfig().umamiWebsiteId || process.env.UMAMI_WEBSITE_ID || '',
 }));
 
 // Lets the renderer grow/shrink the window to fit its visible content. Width is

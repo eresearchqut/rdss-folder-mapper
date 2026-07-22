@@ -91,14 +91,16 @@ the machine is offline, the app is unaffected.
 
 ### Configuration
 
-The website id is baked into the bundle at build time (see [`build.js`](build.js)):
+The website id resolves at runtime, in priority order:
 
-- **Local / dev builds:** the website id falls back to a shared testing id, so it
-  needs no configuration. Note that analytics still only run if a collect URL is
-  resolved (see below) — a local build with no `UMAMI_URL` and no `umamiUrl` in
-  `config.json` will not send anything.
-- **Production builds:** read the id from the `UMAMI_WEBSITE_ID` environment
-  variable, wired in CI from the `UMAMI_WEBSITE_ID` **repository secret**.
+1. `umamiWebsiteId` in the deployment `config.json` (IT-provisioned / per-machine override).
+2. The build-time `UMAMI_WEBSITE_ID` default, baked into the bundle (see
+   [`build.js`](build.js)):
+   - **Local / dev builds:** `UMAMI_WEBSITE_ID` is normally unset, so the id
+     resolves to `''` and nothing is sent unless you provide `umamiWebsiteId` in
+     `config.json`. Analytics also require a resolved collect URL (see below).
+   - **Production builds:** read the id from the `UMAMI_WEBSITE_ID` environment
+     variable, wired in CI from the `UMAMI_WEBSITE_ID` **repository secret**.
 
 The Umami **base URL** resolves at runtime, in priority order:
 
@@ -110,19 +112,18 @@ Provide the Umami **base URL** (e.g. `https://umami.eres.qut.edu.au`); the
 renderer appends the collect path (`/api/send`) itself. A value that already
 includes `/api/send` is also accepted and used as-is, so it is never duplicated.
 
-For security the renderer can only reach the origin allowed by its CSP
-`connect-src` (`https://umami.eres.qut.edu.au`). A resolved URL is therefore
-**origin-validated**: a `umamiUrl` pointing at a different origin is ignored
-(with a logged warning) rather than silently blocked by CSP. Changing the origin
-requires updating both the CSP `<meta>` in `index.html` and
-`ANALYTICS_ALLOWED_ORIGIN` in `main.ts`.
+The renderer's Content-Security-Policy is applied at runtime by the main process
+as a response header (see `buildCspHeader` in `main.ts`), not a static `<meta>`
+tag. Its `connect-src` is built from the resolved Umami origin, so the app can
+reach whatever host is configured via `umamiUrl` / `UMAMI_URL`. When no URL
+resolves, `connect-src` is `'self'` only and no external request is possible.
 
 There is **no hardcoded URL default**. If nothing resolves to a permitted URL,
 analytics are disabled and nothing is sent.
 
 | CI setting | Type | Purpose |
 | --- | --- | --- |
-| `UMAMI_WEBSITE_ID` | Repository secret | Production Umami website id, embedded into release GUI builds |
+| `UMAMI_WEBSITE_ID` | Repository secret | Production Umami website id, embedded into release GUI builds, overridable via `config.json` `umamiWebsiteId` |
 | `UMAMI_URL` | Repository variable | Default Umami **base URL** (e.g. `https://umami.eres.qut.edu.au`; the `/api/send` path is appended by the renderer) baked into release GUI builds, overridable via `config.json` `umamiUrl` |
 
 ## Code signing

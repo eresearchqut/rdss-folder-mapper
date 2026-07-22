@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <!--
-    connect-src whitelists the Umami analytics origin. Keep this origin in sync
-    with ANALYTICS_ALLOWED_ORIGIN in main.ts: the main process origin-validates
-    the resolved collect URL against it, so a mismatch here would silently break
-    analytics.
+    The Content-Security-Policy is set at runtime as a response header by the main
+    process (see buildCspHeader in gui/src/main.ts), so connect-src can include
+    the configured Umami analytics origin. It is intentionally not a static <meta>
+    here.
   -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://umami.eres.qut.edu.au" />
   <title>RDSS Folder Mapper</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
