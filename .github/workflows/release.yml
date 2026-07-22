@@ -117,12 +117,14 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          # Baked into the GUI bundle at build time (see gui/build.js). Absent on
-          # forks / secret-less runs, falling back to the local testing id.
+          # Baked into the GUI bundle at build time (see gui/build.js). A
+          # deployment config.json (umamiWebsiteId) can override it at runtime.
+          # No tracking when unset and no config id.
           UMAMI_WEBSITE_ID: ${{ secrets.UMAMI_WEBSITE_ID }}
-          # Default Umami collect URL baked in at build time; a deployment
-          # config.json (umamiUrl) can still override it at runtime. Non-secret,
-          # so a repository variable. No tracking when unset and no config URL.
+          # Default Umami base URL baked in at build time (the renderer appends
+          # /api/send); a deployment config.json (umamiUrl) can still override it
+          # at runtime. Non-secret, so a repository variable. No tracking when
+          # unset and no config URL.
           UMAMI_URL: ${{ vars.UMAMI_URL }}
         run: >-
           npm run dist --workspace=gui --
@@ -139,12 +141,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Baked into the GUI bundle at build time (see gui/build.js). Absent on
-          # forks / secret-less runs, falling back to the local testing id.
+          # Baked into the GUI bundle at build time (see gui/build.js). A
+          # deployment config.json (umamiWebsiteId) can override it at runtime.
+          # No tracking when unset and no config id.
           UMAMI_WEBSITE_ID: ${{ secrets.UMAMI_WEBSITE_ID }}
-          # Default Umami collect URL baked in at build time; a deployment
-          # config.json (umamiUrl) can still override it at runtime. Non-secret,
-          # so a repository variable. No tracking when unset and no config URL.
+          # Default Umami base URL baked in at build time (the renderer appends
+          # /api/send); a deployment config.json (umamiUrl) can still override it
+          # at runtime. Non-secret, so a repository variable. No tracking when
+          # unset and no config URL.
           UMAMI_URL: ${{ vars.UMAMI_URL }}
         run: npm run dist --workspace=gui
 

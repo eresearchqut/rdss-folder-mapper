@@ -412,7 +412,7 @@ const buildCspHeader = (): string => {
 // Analytics (Umami) config for the renderer. The website id is resolved from the
 // deployment config.json (`umamiWebsiteId`) then the build-time UMAMI_WEBSITE_ID
 // default (see gui/build.js); the base URL is resolved by resolveUmamiUrl. We
-// deliberately expose only the collection URL + id, not a
+// deliberately expose only the Umami base URL + id, not a
 // remote script: the renderer POSTs events directly to Umami's collect API so
 // the Electron CSP can stay 'self' (no remote JS execution) and every payload is
 // sanitized (no file:// path / username leakage). Both fields are normalized to
