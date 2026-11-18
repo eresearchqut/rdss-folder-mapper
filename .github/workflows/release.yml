@@ -11,7 +11,7 @@ jobs:
   build-cli:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -60,7 +60,7 @@ jobs:
       HAS_WIN_SIGNING: ${{ secrets.AZURE_CLIENT_SECRET != '' && vars.AZURE_TS_ENDPOINT != '' && vars.AZURE_TS_ACCOUNT != '' && vars.AZURE_TS_PROFILE != '' && vars.WIN_PUBLISHER_NAME != '' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
