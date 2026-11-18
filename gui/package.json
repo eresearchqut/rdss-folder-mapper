@@ -17,7 +17,7 @@
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "rdss-folder-mapper": "*",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "build": {
     "appId": "au.edu.qut.rdss-folder-mapper",
