@@ -11,11 +11,11 @@
     "dist": "npm run build && electron-builder"
   },
   "devDependencies": {
-    "@electron/notarize": "^3.1.0",
+    "@electron/notarize": "^3.1.2",
     "@types/node": "^25.9.3",
     "electron": "42.4.0",
-    "electron-builder": "^26.15.3",
-    "esbuild": "^0.28.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
     "rdss-folder-mapper": "*",
     "typescript": "^6.0.3"
   },
