@@ -174,7 +174,7 @@ jobs:
           merge-multiple: true
 
       - name: Release (versioned tag)
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: release-files/**
 
@@ -188,7 +188,7 @@ jobs:
         run: gh release delete latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
 
       - name: Update Latest Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest
           target_commitish: ${{ github.sha }}
