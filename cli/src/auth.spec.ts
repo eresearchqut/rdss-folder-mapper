@@ -276,6 +276,35 @@ describe('auth – C4: PKCE in authorization code flow', () => {
     expect(body).toContain('code_verifier=');
     expect(body).toContain('code=authcode');
   });
+
+  it('requests only the OIDC scopes', async () => {
+    vi.mocked(os.platform).mockReturnValue('win32');
+
+    const openMock = await import('open').then((m) => m.default as unknown as ReturnType<typeof vi.fn>);
+    openMock.mockResolvedValue(undefined);
+
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      headers: { entries: () => [] },
+      json: async () => ({ id_token: 'scope-token' }),
+    } as any);
+
+    const loginPromise = performLogin({
+      authDomain: 'auth.example.com',
+      clientId: 'client',
+      callbackUrls: ['http://127.0.0.1:3012/'],
+      debug: false,
+    });
+
+    await new Promise((r) => setTimeout(r, 300));
+    await new Promise<void>((resolve, reject) => {
+      http.get('http://127.0.0.1:3012/?code=authcode', () => resolve()).on('error', reject);
+    });
+    await loginPromise;
+
+    const authUrl = new URL(openMock.mock.calls[0][0] as string);
+    expect(authUrl.searchParams.get('scope')).toBe('openid email profile');
+  });
 });
 
 // ─── C6 Regression: Authorization header redacted in debug logs ──────────────
