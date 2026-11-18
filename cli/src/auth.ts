@@ -141,7 +141,7 @@ export const performLogin = async (options: LoginOptions): Promise<string | unde
   const codeVerifier = randomBytes(32).toString('base64url');
   const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
 
-  const scope = 'phone email profile openid aws.cognito.signin.user.admin';
+  const scope = 'openid email profile';
   const fullAuthUrl = `${authUrl}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&code_challenge_method=S256&code_challenge=${encodeURIComponent(codeChallenge)}`;
 
   return new Promise((resolve) => {
