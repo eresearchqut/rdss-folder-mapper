@@ -17,7 +17,7 @@
     "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
-    "puppeteer": "^25.17.0",
+    "puppeteer": "^25.18.1",
     "vitepress": "^1.6.4"
   },
   "version": "1.13.1"
